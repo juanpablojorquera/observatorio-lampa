@@ -1,0 +1,1831 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Observatorio de Población Validada FONASA 2026 - 2027 | Red de Salud Lampa</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eff6ff',
+              100: '#dbeafe',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+              800: '#1e40af',
+              900: '#1e3a8a',
+            },
+            health: {
+              teal: '#0d9488',
+              cyan: '#06b6d4',
+              emerald: '#10b981',
+              rose: '#f43f5e',
+              amber: '#f59e0b',
+              violet: '#8b5cf6'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Chart.js 4 & PapaParse -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+  <!-- Cache Control (Prevent stale browser caches) -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+
+  <!-- Preloaded Official Compact Dataset (Synchronous in-memory load) -->
+  <script src="data.js"></script>
+
+  <!-- Custom Stylesheet -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="h-full bg-slate-50 text-slate-800 dark:bg-slate-950 dark:text-slate-100 transition-colors duration-200">
+
+  <!-- Loading Overlay -->
+  <div id="loading-overlay" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-900/80 backdrop-blur-sm text-white transition-opacity duration-300">
+    <div class="bg-slate-900 p-8 rounded-2xl shadow-2xl max-w-md w-full mx-4 border border-slate-700 text-center">
+      <div class="relative w-16 h-16 mx-auto mb-4">
+        <div class="w-16 h-16 rounded-full border-4 border-blue-500/20 border-t-blue-500 animate-spin"></div>
+        <div class="absolute inset-0 flex items-center justify-center">
+          <svg class="w-7 h-7 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+          </svg>
+        </div>
+      </div>
+      <h3 class="text-xl font-bold mb-1" id="loading-title">Cargando Datos de Población</h3>
+      <p class="text-sm text-slate-400 mb-4" id="loading-desc">Conectando con Google Sheets y procesando registros...</p>
+      
+      <!-- Progress bar -->
+      <div class="w-full bg-slate-800 rounded-full h-2.5 mb-2 overflow-hidden">
+        <div id="loading-bar" class="bg-gradient-to-r from-blue-500 to-teal-400 h-2.5 rounded-full transition-all duration-300" style="width: 15%"></div>
+      </div>
+      <span class="text-xs text-slate-400 font-mono" id="loading-progress-text">Iniciando descarga...</span>
+    </div>
+  </div>
+
+  <!-- Main Container -->
+  <div id="dashboard-container" class="min-h-full flex flex-col">
+
+    <!-- Header Navbar -->
+    <header class="sticky top-0 z-40 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4">
+        
+        <!-- Logo & Title -->
+        <div class="flex items-center space-x-3.5">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-teal-500 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-3-3v6m-9 3h18a2 2 0 002-2V6a2 2 0 00-2-2H3a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+            </svg>
+          </div>
+          <div>
+            <div class="flex items-center space-x-2">
+              <h1 class="text-lg font-bold text-slate-900 dark:text-white leading-tight">
+                Observatorio de Población Validada FONASA
+              </h1>
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300">
+                2026 - 2027
+              </span>
+            </div>
+            <p class="text-xs text-slate-500 dark:text-slate-400">
+              Red de Atención Primaria de Salud (APS) • Comuna de Lampa
+            </p>
+          </div>
+        </div>
+
+        <!-- Status & Controls -->
+        <div id="header-controls" class="flex items-center flex-wrap gap-2.5">
+          
+          <!-- Data Source Pill -->
+          <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+            <span class="relative flex h-2.5 w-2.5">
+              <span id="status-pulse" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span id="status-dot" class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+            </span>
+            <span id="status-text" class="text-slate-700 dark:text-slate-300">Conectado a Google Sheets</span>
+            <span id="status-count" class="text-slate-400 font-mono text-[11px]">(181.299 reg)</span>
+          </div>
+
+          <!-- Refresh Data Button -->
+          <button id="btn-refresh" title="Recargar datos desde el enlace oficial" class="p-2 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-50 dark:text-slate-400 dark:hover:text-blue-400 dark:hover:bg-slate-800 transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+          </button>
+
+          <!-- Load Local CSV Button -->
+          <label class="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-750 transition shadow-sm">
+            <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+            </svg>
+            <span>Subir CSV</span>
+            <input type="file" id="csv-file-input" accept=".csv" class="hidden">
+          </label>
+
+          <!-- Button Ficha de Centro -->
+          <button id="btn-open-ficha" title="Generar e imprimir ficha ejecutiva de establecimiento" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-750 transition shadow-sm">
+            <svg class="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            <span class="hidden sm:inline">Ficha de Centro</span>
+          </button>
+
+          <!-- Print / PDF Report Button -->
+          <button onclick="window.print()" title="Imprimir informe ejecutivo o guardar en PDF" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-750 transition shadow-sm">
+            <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+            </svg>
+            <span class="hidden sm:inline">Informe PDF</span>
+          </button>
+
+          <!-- Dark/Light Theme Toggle -->
+          <button id="theme-toggle" title="Cambiar tema claro / oscuro" class="p-2 rounded-lg text-slate-600 hover:text-amber-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-amber-300 dark:hover:bg-slate-800 transition">
+            <svg id="theme-icon-dark" class="w-4 h-4 hidden" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path>
+            </svg>
+            <svg id="theme-icon-light" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"></path>
+            </svg>
+          </button>
+        </div>
+
+      </div>
+    </header>
+
+    <!-- Main Body Content -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+      <!-- Collapsible Filters Section -->
+      <section id="filter-panel" class="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200/80 dark:border-slate-800 transition">
+        
+        <!-- Filter Header with Active Count & Reset -->
+        <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-100 dark:border-slate-800">
+          <div class="flex items-center space-x-2">
+            <svg class="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
+            </svg>
+            <h2 class="text-sm font-bold tracking-wide uppercase text-slate-700 dark:text-slate-300">
+              Filtros Dinámicos
+            </h2>
+            <span id="active-filters-badge" class="hidden px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200">
+              0 activos
+            </span>
+          </div>
+
+          <div class="flex items-center space-x-3">
+            <span id="filtered-records-text" class="text-xs font-medium text-slate-500 dark:text-slate-400">
+              Mostrando <strong id="filter-count-num" class="text-slate-900 dark:text-white font-mono">181.299</strong> de 181.299 registros
+            </span>
+            <button id="btn-reset-filters" class="text-xs font-semibold text-rose-600 hover:text-rose-700 dark:text-rose-400 hover:underline flex items-center space-x-1">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+              <span>Limpiar Filtros</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Filter Controls Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5 text-xs">
+          
+          <!-- Filter: Año Proceso -->
+          <div>
+            <label class="block font-semibold text-slate-600 dark:text-slate-400 mb-1">Año de Proceso</label>
+            <select id="filter-year" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 font-medium text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500">
+              <option value="ALL">Ambos (2026 y 2027)</option>
+              <option value="2027" selected>2027 (Corte 30/09/2026)</option>
+              <option value="2026">2026 (Corte 30/09/2025)</option>
+            </select>
+          </div>
+
+          <!-- Filter: Centro de Salud -->
+          <div class="lg:col-span-2">
+            <label class="block font-semibold text-slate-600 dark:text-slate-400 mb-1">Centro de Salud</label>
+            <select id="filter-center" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 font-medium text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 truncate">
+              <option value="ALL">Todos los Establecimientos</option>
+              <option value="Centro de Salud Familiar  José Bauza Frau">CESFAM José Bauza Frau</option>
+              <option value="Centro de Salud Familiar Batuco">CESFAM Batuco</option>
+              <option value="Posta de Salud Rural Juan Pablo II de Lampa">PSR Juan Pablo II de Lampa</option>
+              <option value="Centro Comunitario de Salud Familiar Sol de Septiembre">CECOSF Sol de Septiembre</option>
+              <option value="Centro Comunitario de Salud Familiar Batuco">CECOSF Batuco</option>
+            </select>
+          </div>
+
+          <!-- Filter: Sector Territorial -->
+          <div>
+            <label class="block font-semibold text-slate-600 dark:text-slate-400 mb-1">Sector Territorial</label>
+            <select id="filter-sector" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 font-medium text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500">
+              <option value="ALL">Todos los Sectores</option>
+              <option value="Azul">Sector Azul</option>
+              <option value="Amarillo">Sector Amarillo</option>
+              <option value="Verde">Sector Verde</option>
+              <option value="Sector 1">Sector 1</option>
+              <option value="Sector 2">Sector 2</option>
+              <option value="Sala Neurodiversa">Sala Neurodiversa</option>
+              <option value="CECOSF">CECOSF</option>
+              <option value="Sin Datos">Sin Datos / Comunal</option>
+            </select>
+          </div>
+
+          <!-- Filter: Tramo FONASA -->
+          <div>
+            <label class="block font-semibold text-slate-600 dark:text-slate-400 mb-1">Tramo FONASA</label>
+            <select id="filter-tramo" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 font-medium text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500">
+              <option value="ALL">Todos los Tramos</option>
+              <option value="A">Tramo A (Gratuidad)</option>
+              <option value="B">Tramo B (Ingreso Mín.)</option>
+              <option value="C">Tramo C</option>
+              <option value="D">Tramo D</option>
+              <option value="X">Tramo X (En trámite)</option>
+            </select>
+          </div>
+
+          <!-- Filter: Género -->
+          <div>
+            <label class="block font-semibold text-slate-600 dark:text-slate-400 mb-1">Género</label>
+            <select id="filter-gender" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 font-medium text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500">
+              <option value="ALL">Todos los Géneros</option>
+              <option value="MUJER">Mujeres</option>
+              <option value="HOMBRE">Hombres</option>
+              <option value="INTERSEX">Intersex</option>
+            </select>
+          </div>
+
+        </div>
+
+        <!-- Secondary Filter Tags (Age, Nationality, Priority Programs) -->
+        <div class="mt-3.5 pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+          
+          <!-- Age & Nationality dropdowns -->
+          <div class="flex flex-wrap items-center gap-3">
+            <div class="flex items-center space-x-1.5">
+              <span class="text-slate-500 font-medium">Edad:</span>
+              <select id="filter-age-group" class="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md px-2 py-1 font-medium text-slate-800 dark:text-slate-200">
+                <option value="ALL">Todas las edades</option>
+                <option value="Menos de 1 año">Menos de 1 año</option>
+                <option value="1 - 4 años">1 - 4 años</option>
+                <option value="5 - 9 años">5 - 9 años</option>
+                <option value="10 - 14 años">10 - 14 años</option>
+                <option value="15 - 19 años">15 - 19 años</option>
+                <option value="20 - 24 años">20 - 24 años</option>
+                <option value="25 - 29 años">25 - 29 años</option>
+                <option value="30 - 34 años">30 - 34 años</option>
+                <option value="35 - 39 años">35 - 39 años</option>
+                <option value="40 - 44 años">40 - 44 años</option>
+                <option value="45 - 49 años">45 - 49 años</option>
+                <option value="50 - 54 años">50 - 54 años</option>
+                <option value="55 - 59 años">55 - 59 años</option>
+                <option value="60 - 64 años">60 - 64 años</option>
+                <option value="65 - 69 años">65 - 69 años</option>
+                <option value="70 - 74 años">70 - 74 años</option>
+                <option value="75 - 79 años">75 - 79 años</option>
+                <option value="80 y mas años">80 y mas años</option>
+                <option value="60plus">60 y más años (Adultos Mayores)</option>
+              </select>
+            </div>
+
+            <div class="flex items-center space-x-1.5">
+              <span class="text-slate-500 font-medium">Nacionalidad:</span>
+              <select id="filter-nationality" class="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md px-2 py-1 font-medium text-slate-800 dark:text-slate-200">
+                <option value="ALL">Todas las Nacionalidades</option>
+                <option value="Chile">Chile (Chilena)</option>
+                <option value="MIGRANTES">Población Migrante (Extranjeros)</option>
+                <option value="Venezuela">Venezuela</option>
+                <option value="Peru">Perú</option>
+                <option value="Haiti">Haití</option>
+                <option value="Colombia">Colombia</option>
+                <option value="Bolivia">Bolivia</option>
+                <option value="Ecuador">Ecuador</option>
+                <option value="Desconocido">Desconocido / Sin Datos</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Quick Toggle Badges (Checkboxes styled as pills) -->
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-slate-400 font-medium text-[11px] uppercase tracking-wider">Filtro Rápido:</span>
+            
+            <label class="cursor-pointer inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-medium transition border border-transparent has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50 dark:has-[:checked]:bg-blue-950/50 has-[:checked]:text-blue-700 dark:has-[:checked]:text-blue-300">
+              <input type="checkbox" id="check-disability" class="rounded text-blue-600 focus:ring-blue-500">
+              <span>♿ Discapacidad</span>
+            </label>
+
+            <label class="cursor-pointer inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-medium transition border border-transparent has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-50 dark:has-[:checked]:bg-emerald-950/50 has-[:checked]:text-emerald-700 dark:has-[:checked]:text-emerald-300">
+              <input type="checkbox" id="check-caregiver" class="rounded text-emerald-600 focus:ring-emerald-500">
+              <span>🤝 Cuidadores</span>
+            </label>
+
+            <label class="cursor-pointer inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-medium transition border border-transparent has-[:checked]:border-purple-500 has-[:checked]:bg-purple-50 dark:has-[:checked]:bg-purple-950/50 has-[:checked]:text-purple-700 dark:has-[:checked]:text-purple-300">
+              <input type="checkbox" id="check-prais" class="rounded text-purple-600 focus:ring-purple-500">
+              <span>🕊️ PRAIS</span>
+            </label>
+
+            <label class="cursor-pointer inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-medium transition border border-transparent has-[:checked]:border-amber-500 has-[:checked]:bg-amber-50 dark:has-[:checked]:bg-amber-950/50 has-[:checked]:text-amber-700 dark:has-[:checked]:text-amber-300">
+              <input type="checkbox" id="check-etnia" class="rounded text-amber-600 focus:ring-amber-500">
+              <span>🌿 Pueblos Originarios</span>
+            </label>
+          </div>
+
+        </div>
+
+      </section>
+
+      <!-- Monitor de Cohortes de Riesgo y Alerta Sanitaria (1 Clic) -->
+      <section id="cohorts-monitor-section" class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-4 sm:p-5 shadow-md border border-indigo-900/50">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <div class="flex items-center space-x-2">
+            <span class="flex h-2.5 w-2.5 relative">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>
+            </span>
+            <h3 class="text-xs font-bold uppercase tracking-wider text-indigo-200">
+              🚨 Monitor de Cohortes de Riesgo y Alertas Sanitarias (Filtro en 1 Clic)
+            </h3>
+          </div>
+          <span class="text-[11px] text-indigo-300">Haz clic en cualquier cohorte para focalizar todo el observatorio</span>
+        </div>
+
+        <!-- Cohort Buttons Grid -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 text-xs">
+          
+          <button data-cohort="adulto-pobreza" class="cohort-btn p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700/80 hover:border-amber-400 text-left transition flex flex-col justify-between group">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-base">👴</span>
+              <span class="font-mono text-[11px] font-bold text-amber-400">3.824</span>
+            </div>
+            <div class="font-bold text-slate-100 group-hover:text-white leading-tight">65+ en Pobreza</div>
+            <div class="text-[10px] text-slate-400 mt-0.5">Adultos 65+ Tramo A</div>
+          </button>
+
+          <button data-cohort="infancia-riesgo" class="cohort-btn p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700/80 hover:border-emerald-400 text-left transition flex flex-col justify-between group">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-base">👶</span>
+              <span class="font-mono text-[11px] font-bold text-emerald-400">2.378</span>
+            </div>
+            <div class="font-bold text-slate-100 group-hover:text-white leading-tight">Infancia Vulnerable</div>
+            <div class="text-[10px] text-slate-400 mt-0.5">Niños 0-4 Tramo A</div>
+          </button>
+
+          <button data-cohort="salud-mujer" class="cohort-btn p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700/80 hover:border-pink-400 text-left transition flex flex-col justify-between group">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-base">👩</span>
+              <span class="font-mono text-[11px] font-bold text-pink-400">31.393</span>
+            </div>
+            <div class="font-bold text-slate-100 group-hover:text-white leading-tight">Salud de la Mujer</div>
+            <div class="text-[10px] text-slate-400 mt-0.5">Mujeres 15 a 49 años</div>
+          </button>
+
+          <button data-cohort="brecha-cuidadores" class="cohort-btn p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700/80 hover:border-rose-400 text-left transition flex flex-col justify-between group">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-base">♿</span>
+              <span class="font-mono text-[11px] font-bold text-rose-400">2.338</span>
+            </div>
+            <div class="font-bold text-slate-100 group-hover:text-white leading-tight">Sin Cuidador</div>
+            <div class="text-[10px] text-slate-400 mt-0.5">Discapacidad sin acreditar</div>
+          </button>
+
+          <button data-cohort="ninos-migrantes" class="cohort-btn p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700/80 hover:border-violet-400 text-left transition flex flex-col justify-between group">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-base">🌍</span>
+              <span class="font-mono text-[11px] font-bold text-violet-400">2.641</span>
+            </div>
+            <div class="font-bold text-slate-100 group-hover:text-white leading-tight">Infancia Migrante</div>
+            <div class="text-[10px] text-slate-400 mt-0.5">Niños &lt; 10 extranjeros</div>
+          </button>
+
+          <button data-cohort="tramo-x" class="cohort-btn p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700/80 hover:border-cyan-400 text-left transition flex flex-col justify-between group">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-base">📋</span>
+              <span class="font-mono text-[11px] font-bold text-cyan-400">4.254</span>
+            </div>
+            <div class="font-bold text-slate-100 group-hover:text-white leading-tight">Tramo X / En Trámite</div>
+            <div class="text-[10px] text-slate-400 mt-0.5">Previsión sin acreditar</div>
+          </button>
+
+        </div>
+
+        <!-- Active Cohort Indicator Banner (Hidden by default) -->
+        <div id="cohort-active-alert" class="hidden mt-3 pt-2.5 border-t border-indigo-900/60 flex items-center justify-between text-xs text-amber-200">
+          <div class="flex items-center space-x-2">
+            <span class="text-amber-400">⚠️</span>
+            <span>Cohorte activa: <strong id="cohort-active-name" class="text-white font-bold"></strong> (<span id="cohort-active-count" class="font-mono font-bold"></span> personas filtradas).</span>
+          </div>
+          <button id="btn-clear-cohort" class="text-xs font-semibold text-rose-300 hover:text-rose-100 underline">Quitar filtro de cohorte</button>
+        </div>
+      </section>
+
+      <!-- Executive KPI Cards Grid -->
+      <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+        
+        <!-- KPI 1: Total Población Validada -->
+        <div class="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200/80 dark:border-slate-800 relative overflow-hidden flex flex-col justify-between">
+          <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
+            <span class="text-xs font-bold uppercase tracking-wider">Total Validados</span>
+            <div class="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+              </svg>
+            </div>
+          </div>
+          <div>
+            <div id="kpi-total-validados" class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white font-mono tracking-tight">
+              92.263
+            </div>
+            <div class="mt-1 flex items-center gap-1.5 text-xs">
+              <span id="kpi-total-badge" class="font-bold text-emerald-600 dark:text-emerald-400 flex items-center">
+                ↑ +3.6% (+3.227)
+              </span>
+              <span class="text-slate-400">vs 2026</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- KPI 2: Género y Razón de Sexos -->
+        <div class="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200/80 dark:border-slate-800 flex flex-col justify-between">
+          <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
+            <span class="text-xs font-bold uppercase tracking-wider">Distribución Género</span>
+            <div class="w-7 h-7 rounded-lg bg-pink-50 dark:bg-pink-950/60 text-pink-600 dark:text-pink-400 flex items-center justify-center">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+              </svg>
+            </div>
+          </div>
+          <div>
+            <div class="flex justify-between items-baseline">
+              <span class="text-xs font-semibold text-pink-600 dark:text-pink-400">Mujeres: <strong id="kpi-mujeres-pct" class="font-mono text-base">52.3%</strong></span>
+              <span class="text-xs font-semibold text-blue-600 dark:text-blue-400">Hombres: <strong id="kpi-hombres-pct" class="font-mono text-base">47.7%</strong></span>
+            </div>
+            <!-- Proportional Bar -->
+            <div class="w-full bg-blue-500 rounded-full h-2 my-1.5 overflow-hidden flex">
+              <div id="kpi-gender-bar" class="bg-pink-500 h-2 rounded-l-full" style="width: 52.3%"></div>
+            </div>
+            <div class="flex justify-between text-[11px] text-slate-400 font-mono">
+              <span id="kpi-mujeres-count">48.229</span>
+              <span id="kpi-hombres-count">44.025</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- KPI 3: Vulnerabilidad FONASA (Tramos A y B) -->
+        <div class="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200/80 dark:border-slate-800 flex flex-col justify-between">
+          <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
+            <span class="text-xs font-bold uppercase tracking-wider">FONASA Tramo A + B</span>
+            <div class="w-7 h-7 rounded-lg bg-teal-50 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400 flex items-center justify-center">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+              </svg>
+            </div>
+          </div>
+          <div>
+            <div id="kpi-vulnerables-count" class="text-2xl sm:text-3xl font-extrabold text-teal-600 dark:text-teal-400 font-mono tracking-tight">
+              56.484
+            </div>
+            <div class="mt-1 flex items-center justify-between text-xs">
+              <span id="kpi-vulnerables-pct" class="font-bold text-slate-700 dark:text-slate-300">61.2% del total</span>
+              <span class="text-[11px] text-slate-400">Tramo A: 33.9%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- KPI 4: Población Adulto Mayor (60+) -->
+        <div class="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200/80 dark:border-slate-800 flex flex-col justify-between">
+          <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
+            <span class="text-xs font-bold uppercase tracking-wider">Adultos Mayores (60+)</span>
+            <div class="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+              </svg>
+            </div>
+          </div>
+          <div>
+            <div id="kpi-adultos-mayores" class="text-2xl sm:text-3xl font-extrabold text-amber-600 dark:text-amber-400 font-mono tracking-tight">
+              12.457
+            </div>
+            <div class="mt-1 flex items-center justify-between text-xs">
+              <span id="kpi-adultos-pct" class="font-bold text-slate-700 dark:text-slate-300">13.5% del total</span>
+              <span class="text-[11px] text-slate-400">80+ años: 1.694</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- KPI 5: Población Migrante -->
+        <div class="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200/80 dark:border-slate-800 flex flex-col justify-between">
+          <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
+            <span class="text-xs font-bold uppercase tracking-wider">Población Migrante</span>
+            <div class="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </div>
+          </div>
+          <div>
+            <div id="kpi-migrantes-count" class="text-2xl sm:text-3xl font-extrabold text-indigo-600 dark:text-indigo-400 font-mono tracking-tight">
+              10.953
+            </div>
+            <div class="mt-1 flex items-center justify-between text-xs">
+              <span id="kpi-migrantes-pct" class="font-bold text-slate-700 dark:text-slate-300">11.9% del total</span>
+              <span class="text-emerald-600 dark:text-emerald-400 font-semibold font-mono text-[11px]">↑ +22.6% vs '26</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- KPI 6: Programas Prioritarios (PRAIS, Discapacidad, Cuidador) -->
+        <div class="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200/80 dark:border-slate-800 flex flex-col justify-between">
+          <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
+            <span class="text-xs font-bold uppercase tracking-wider">Grupos Prioritarios</span>
+            <div class="w-7 h-7 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+              </svg>
+            </div>
+          </div>
+          <div class="space-y-1 text-xs">
+            <div class="flex justify-between items-center">
+              <span class="text-slate-500">Discapacidad:</span>
+              <strong id="kpi-discapacidad" class="font-mono text-slate-800 dark:text-slate-200">1.328</strong>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-slate-500">Cuidadores:</span>
+              <strong id="kpi-cuidadores" class="font-mono text-slate-800 dark:text-slate-200">273</strong>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-slate-500">Beneficiarios PRAIS:</span>
+              <strong id="kpi-prais" class="font-mono text-slate-800 dark:text-slate-200">1.254</strong>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- Navigation Tabs -->
+      <div id="tabs-navigation" class="border-b border-slate-200 dark:border-slate-800 flex space-x-1 sm:space-x-4 overflow-x-auto text-sm font-semibold">
+        <button data-tab="tab-resumen" onclick="switchTab('tab-resumen')" class="tab-btn active py-2.5 px-3 border-b-2 border-blue-600 text-blue-600 dark:text-blue-400 whitespace-nowrap flex items-center space-x-2">
+          <span>📊 Visión General</span>
+        </button>
+        <button data-tab="tab-comparativa-interanual" onclick="switchTab('tab-comparativa-interanual')" class="tab-btn py-2.5 px-3 border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 whitespace-nowrap flex items-center space-x-2">
+          <span>📈 Comparativo 2026 vs 2027</span>
+        </button>
+        <button data-tab="tab-demografia" onclick="switchTab('tab-demografia')" class="tab-btn py-2.5 px-3 border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 whitespace-nowrap flex items-center space-x-2">
+          <span>👥 Demografía y Pirámide</span>
+        </button>
+        <button data-tab="tab-tramos" onclick="switchTab('tab-tramos')" class="tab-btn py-2.5 px-3 border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 whitespace-nowrap flex items-center space-x-2">
+          <span>🏥 Tramos FONASA</span>
+        </button>
+        <button data-tab="tab-inclusion" onclick="switchTab('tab-inclusion')" class="tab-btn py-2.5 px-3 border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 whitespace-nowrap flex items-center space-x-2">
+          <span>🌎 Migración & Inclusión</span>
+        </button>
+        <button data-tab="tab-simulador" onclick="switchTab('tab-simulador')" class="tab-btn py-2.5 px-3 border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 whitespace-nowrap flex items-center space-x-2">
+          <span>💰 Financiamiento Per Cápita</span>
+        </button>
+        <button data-tab="tab-datos" onclick="switchTab('tab-datos')" class="tab-btn py-2.5 px-3 border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 whitespace-nowrap flex items-center space-x-2">
+          <span>📋 Explorador de Datos</span>
+        </button>
+      </div>
+
+      <!-- TAB 1: Comparativa y Centros de Salud -->
+      <div id="tab-resumen" class="tab-content space-y-6">
+        
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          <!-- Bar Chart: Comparativa Centros 2026 vs 2027 -->
+          <div class="lg:col-span-2 bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200/80 dark:border-slate-800">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h3 class="text-base font-bold text-slate-900 dark:text-white">
+                  Población Validada por Centro de Salud (2026 vs 2027)
+                </h3>
+                <p class="text-xs text-slate-500 dark:text-slate-400">
+                  Comparativa de inscritos per cápita validados entre ambos períodos
+                </p>
+              </div>
+              <div class="flex items-center space-x-3 text-xs font-medium">
+                <span class="flex items-center space-x-1.5"><span class="w-3 h-3 rounded bg-blue-300 dark:bg-blue-900"></span> <span>2026</span></span>
+                <span class="flex items-center space-x-1.5"><span class="w-3 h-3 rounded bg-blue-600"></span> <span>2027</span></span>
+                <button type="button" onclick="window.exportChartPNG('chart-centros-comparativa', 'Población Validada por Centro de Salud (2026 vs 2027)')" class="chart-export-btn p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition" title="Exportar gráfico en alta resolución PNG">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                </button>
+              </div>
+            </div>
+            <div class="h-80 w-full">
+              <canvas id="chart-centros-comparativa"></canvas>
+            </div>
+          </div>
+
+          <!-- Donut Chart: Distribución por Tramo FONASA -->
+          <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200/80 dark:border-slate-800 flex flex-col justify-between">
+            <div class="flex items-start justify-between mb-2">
+              <div>
+                <h3 class="text-base font-bold text-slate-900 dark:text-white">
+                  Distribución por Tramo FONASA
+                </h3>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mb-2">
+                  Proporción de tramos A, B, C, D y X en la selección actual
+                </p>
+              </div>
+              <button type="button" onclick="window.exportChartPNG('chart-tramos-donut', 'Distribución por Tramo FONASA')" class="chart-export-btn p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition" title="Exportar gráfico en alta resolución PNG">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+              </button>
+            </div>
+            <div class="h-64 relative flex items-center justify-center">
+              <canvas id="chart-tramos-donut"></canvas>
+            </div>
+            <div id="tramos-donut-legend" class="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 text-xs">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Comparative Table of Health Centers -->
+        <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200/80 dark:border-slate-800">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-base font-bold text-slate-900 dark:text-white">
+                Detalle Comparativo por Establecimiento de Salud
+              </h3>
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                Variación de inscritos validados entre el proceso 2026 y 2027
+              </p>
+            </div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left">
+              <thead class="bg-slate-50 dark:bg-slate-800/60 uppercase font-bold text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
+                <tr>
+                  <th class="px-4 py-3">Establecimiento</th>
+                  <th class="px-4 py-3 text-right">Validados 2026</th>
+                  <th class="px-4 py-3 text-right">Validados 2027</th>
+                  <th class="px-4 py-3 text-right">Variación Absoluta</th>
+                  <th class="px-4 py-3 text-right">% Crecimiento</th>
+                  <th class="px-4 py-3 text-right">% Participación 2027</th>
+                </tr>
+              </thead>
+              <tbody id="table-centros-comparativa-body" class="divide-y divide-slate-100 dark:divide-slate-800">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Índice Compuesto de Vulnerabilidad y Demanda Asistencial por Centro -->
+        <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 sm:p-6 shadow-sm border border-slate-200/80 dark:border-slate-800">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-6">
+            <div>
+              <div class="flex items-center space-x-2">
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-rose-100 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
+                  Priorización Asistencial APS
+                </span>
+                <h3 class="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
+                  🎯 Índice Compuesto de Vulnerabilidad y Demanda Asistencial por Centro
+                </h3>
+              </div>
+              <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-3xl">
+                Modelo multicriterio ponderado de carga sanitaria: <strong>Tramo A (35%)</strong>, <strong>Adultos 60+ (25%)</strong>, <strong>Infancia &lt; 10 años (20%)</strong>, <strong>Población Migrante (15%)</strong> y <strong>Discapacidad (5%)</strong>.
+              </p>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">Año de Evaluación:</span>
+              <span id="vulnerability-year-badge" class="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-mono font-bold text-xs border border-blue-200 dark:border-blue-800">
+                2027
+              </span>
+            </div>
+          </div>
+
+          <!-- Cards Grid for the 5 Centers -->
+          <div id="vulnerability-index-cards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <!-- Dynamically populated by renderVulnerabilityIndexSection() -->
+          </div>
+
+          <!-- Technical Note & Action Banner -->
+          <div class="mt-5 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-300 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+            <div class="flex items-start space-x-2.5">
+              <span class="text-base">💡</span>
+              <div class="space-y-0.5">
+                <span class="font-bold text-slate-800 dark:text-slate-200">Recomendación Estratégica para Gestión Municipal:</span>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                  Los centros con puntaje más alto (como CECOSF Sol de Septiembre y CECOSF Batuco) presentan una concentración crítica de vulnerabilidad socioeconómica y barreras idiomático-culturales, requiriendo mayor asignación relativa de horas médicas y programas de equidad en salud.
+                </p>
+              </div>
+            </div>
+            <button onclick="document.getElementById('btn-open-ficha').click()" class="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shadow-sm transition">
+              <span>Ver Ficha Técnica por Centro</span>
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Sectors Horizontal Bar Chart -->
+        <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200/80 dark:border-slate-800">
+          <div class="flex items-start justify-between mb-4">
+            <div>
+              <h3 class="text-base font-bold text-slate-900 dark:text-white mb-1">
+                Distribución por Sector Territorial
+              </h3>
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                Población validada según sector asignado en cada centro de salud
+              </p>
+            </div>
+            <button type="button" onclick="window.exportChartPNG('chart-sectores', 'Distribución por Sector Territorial')" class="chart-export-btn p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition" title="Exportar gráfico en alta resolución PNG">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+            </button>
+          </div>
+          <div class="h-64 w-full">
+            <canvas id="chart-sectores"></canvas>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- TAB: Análisis Comparativo 2026 vs 2027 -->
+      <div id="tab-comparativa-interanual" class="tab-content hidden space-y-6">
+        
+        <!-- Executive Comparative Highlights Banner -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div class="bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-2xl p-5 shadow-sm">
+            <span class="text-xs uppercase font-bold tracking-wider text-blue-200">Crecimiento Neto Comunal</span>
+            <div class="text-2xl sm:text-3xl font-extrabold font-mono mt-1">+3.227</div>
+            <div class="mt-2 text-xs flex items-center justify-between text-blue-100">
+              <span>+3.62% de incremento</span>
+              <span class="font-mono text-[11px]">89.036 → 92.263</span>
+            </div>
+          </div>
+
+          <div class="bg-gradient-to-br from-emerald-600 to-teal-700 text-white rounded-2xl p-5 shadow-sm">
+            <span class="text-xs uppercase font-bold tracking-wider text-emerald-200">Explosión Fonasa Tramo A</span>
+            <div class="text-2xl sm:text-3xl font-extrabold font-mono mt-1">+8.198</div>
+            <div class="mt-2 text-xs flex items-center justify-between text-emerald-100">
+              <span>+35.54% de aumento</span>
+              <span class="font-mono text-[11px]">23.066 → 31.264</span>
+            </div>
+          </div>
+
+          <div class="bg-gradient-to-br from-violet-600 to-purple-700 text-white rounded-2xl p-5 shadow-sm">
+            <span class="text-xs uppercase font-bold tracking-wider text-violet-200">Aporte Población Migrante</span>
+            <div class="text-2xl sm:text-3xl font-extrabold font-mono mt-1">+2.019</div>
+            <div class="mt-2 text-xs flex items-center justify-between text-violet-100">
+              <span>62.6% del crecimiento neto</span>
+              <span class="font-mono text-[11px]">8.934 → 10.953</span>
+            </div>
+          </div>
+
+          <div class="bg-gradient-to-br from-amber-600 to-orange-700 text-white rounded-2xl p-5 shadow-sm">
+            <span class="text-xs uppercase font-bold tracking-wider text-amber-200">Envejecimiento (60+ años)</span>
+            <div class="text-2xl sm:text-3xl font-extrabold font-mono mt-1">+899</div>
+            <div class="mt-2 text-xs flex items-center justify-between text-amber-100">
+              <span>+7.78% en tercera edad</span>
+              <span class="font-mono text-[11px]">70-74 años: +9.3%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Comparative Charts Grid 1: Centros Delta & Tramos Delta -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          
+          <!-- Delta por Centro -->
+          <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200/80 dark:border-slate-800">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h3 class="text-base font-bold text-slate-900 dark:text-white">
+                  Variación Neta por Centro de Salud (2026 vs 2027)
+                </h3>
+                <p class="text-xs text-slate-500 dark:text-slate-400">
+                  Nuevos inscritos validados incorporados a cada centro de la red comunal
+                </p>
+              </div>
+              <button type="button" onclick="window.exportChartPNG('chart-comparativa-centros-delta', 'Variación Neta por Centro de Salud (2026 vs 2027)')" class="chart-export-btn p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition" title="Exportar gráfico en alta resolución PNG">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+              </button>
+            </div>
+            <div class="h-80 w-full">
+              <canvas id="chart-comparativa-centros-delta"></canvas>
+            </div>
+          </div>
+
+          <!-- Delta por Tramos (Migración Inter-tramos) -->
+          <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200/80 dark:border-slate-800">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h3 class="text-base font-bold text-slate-900 dark:text-white">
+                  Desplazamiento Inter-Tramos FONASA (Variación Neta)
+                </h3>
+                <p class="text-xs text-slate-500 dark:text-slate-400">
+                  Traspaso de beneficiarios hacia el Tramo A de gratuidad
+                </p>
+              </div>
+              <button type="button" onclick="window.exportChartPNG('chart-comparativa-tramos-delta', 'Desplazamiento Inter-Tramos FONASA (Variación Neta)')" class="chart-export-btn p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition" title="Exportar gráfico en alta resolución PNG">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+              </button>
+            </div>
+            <div class="h-80 w-full">
+              <canvas id="chart-comparativa-tramos-delta"></canvas>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Comparative Charts Grid 2: 18 Age Brackets Delta & Migrants Delta -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          
+          <!-- Delta 18 Grupos Etarios -->
+          <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200/80 dark:border-slate-800">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h3 class="text-base font-bold text-slate-900 dark:text-white">
+                  Variación Neta por Grupo Etario (18 Grupos)
+                </h3>
+                <p class="text-xs text-slate-500 dark:text-slate-400">
+                  Disminución en primera infancia (1-4 años: -296) vs aumento en adultos y tercera edad
+                </p>
+              </div>
+              <button type="button" onclick="window.exportChartPNG('chart-comparativa-edades-delta', 'Variación Neta por Grupo Etario (18 Grupos)')" class="chart-export-btn p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition" title="Exportar gráfico en alta resolución PNG">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+              </button>
+            </div>
+            <div class="h-96 w-full">
+              <canvas id="chart-comparativa-edades-delta"></canvas>
+            </div>
+          </div>
+
+          <!-- Delta Migrantes por Nacionalidad -->
+          <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200/80 dark:border-slate-800">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h3 class="text-base font-bold text-slate-900 dark:text-white">
+                  Crecimiento Migrante por País de Origen
+                </h3>
+                <p class="text-xs text-slate-500 dark:text-slate-400">
+                  Nuevos residentes extranjeros inscritos entre 2026 y 2027
+                </p>
+              </div>
+              <button type="button" onclick="window.exportChartPNG('chart-comparativa-migrantes-delta', 'Crecimiento Migrante por País de Origen')" class="chart-export-btn p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition" title="Exportar gráfico en alta resolución PNG">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+              </button>
+            </div>
+            <div class="h-96 w-full">
+              <canvas id="chart-comparativa-migrantes-delta"></canvas>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Matriz Comparativa Interanual Detallada -->
+        <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200/80 dark:border-slate-800">
+          <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div>
+              <h3 class="text-base font-bold text-slate-900 dark:text-white">
+                Matriz Analítica Comparativa 2026 vs 2027
+              </h3>
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                Selecciona la dimensión de análisis para desglosar la variación interanual
+              </p>
+            </div>
+            <div class="flex items-center space-x-2 text-xs">
+              <span class="text-slate-500 font-medium">Dimensión:</span>
+              <select id="select-comparativa-dimension" class="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 font-bold text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500">
+                <option value="centros" selected>Centros de Salud</option>
+                <option value="tramos">Tramos FONASA</option>
+                <option value="edades">Grupos Etarios (18 Grupos)</option>
+                <option value="naciones">Top Nacionalidades</option>
+                <option value="programas">Programas Prioritarios</option>
+              </select>
+            </div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left">
+              <thead class="bg-slate-50 dark:bg-slate-800/60 uppercase font-bold text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
+                <tr>
+                  <th class="px-4 py-3">Categoría</th>
+                  <th class="px-4 py-3 text-right">Validados 2026</th>
+                  <th class="px-4 py-3 text-right">Validados 2027</th>
+                  <th class="px-4 py-3 text-right">Variación Absoluta (Δ)</th>
+                  <th class="px-4 py-3 text-right">% Crecimiento</th>
+                  <th class="px-4 py-3 text-right">% Aporte al Crecimiento</th>
+                </tr>
+              </thead>
+              <tbody id="table-matriz-comparativa-body" class="divide-y divide-slate-100 dark:divide-slate-800">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- TAB 2: Demografía y Pirámide Poblacional -->
+      <div id="tab-demografia" class="tab-content hidden space-y-6">
+        
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          <!-- Pirámide Poblacional (Hombres vs Mujeres) -->
+          <div class="lg:col-span-2 bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200/80 dark:border-slate-800">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+              <div>
+                <h3 class="text-base font-bold text-slate-900 dark:text-white">
+                  Pirámide Poblacional (Estructura Etaria por Género)
+                </h3>
+                <p class="text-xs text-slate-500 dark:text-slate-400">
+                  Distribución comparativa de hombres (izquierda) y mujeres (derecha) en 18 grupos etarios
+                </p>
+              </div>
+              <div class="flex items-center space-x-3 text-xs font-medium">
+                <button id="btn-toggle-pyramid-order" title="Alternar entre orden descendente o base inferior" class="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold transition flex items-center space-x-1">
+                  <span>↕️ Alternar Orden</span>
+                </button>
+                <span class="flex items-center space-x-1"><span class="w-3 h-3 rounded bg-blue-500"></span> <span>Hombres</span></span>
+                <span class="flex items-center space-x-1"><span class="w-3 h-3 rounded bg-pink-500"></span> <span>Mujeres</span></span>
+                <button type="button" onclick="window.exportChartPNG('chart-piramide', 'Pirámide Poblacional Oficial 18 Tramos')" class="chart-export-btn p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition" title="Exportar gráfico en alta resolución PNG">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                </button>
+              </div>
+            </div>
+            <div class="h-[540px] w-full">
+              <canvas id="chart-piramide"></canvas>
+            </div>
+          </div>
+
+          <!-- Demographic Summary Cards & Metrics -->
+          <div class="space-y-4">
+            
+            <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200/80 dark:border-slate-800">
+              <h4 class="text-sm font-bold text-slate-900 dark:text-white mb-3">
+                Indicadores Demográficos Clave
+              </h4>
+              <div class="space-y-3 text-xs">
+                <div class="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-800">
+                  <span class="text-slate-500">Edad Media de la Población:</span>
+                  <span id="demo-edad-media" class="font-bold font-mono text-slate-800 dark:text-slate-200">33.9 años</span>
+                </div>
+                <div class="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-800">
+                  <span class="text-slate-500">Índice de Masculinidad:</span>
+                  <span id="demo-razon-sexo" class="font-bold font-mono text-slate-800 dark:text-slate-200">91.3 hombres / 100 mujeres</span>
+                </div>
+                <div class="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-800">
+                  <span class="text-slate-500">Población Infantil (< 10 años):</span>
+                  <span id="demo-infantil" class="font-bold font-mono text-slate-800 dark:text-slate-200">12.646 (13.7%)</span>
+                </div>
+                <div class="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-800">
+                  <span class="text-slate-500">Población Juvenil (10 a 29 años):</span>
+                  <span id="demo-juvenil" class="font-bold font-mono text-slate-800 dark:text-slate-200">28.843 (31.3%)</span>
+                </div>
+                <div class="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-800">
+                  <span class="text-slate-500">Población Adulta (30 a 59 años):</span>
+                  <span id="demo-adulta" class="font-bold font-mono text-slate-800 dark:text-slate-200">38.317 (41.5%)</span>
+                </div>
+                <div class="flex justify-between items-center py-2">
+                  <span class="text-slate-500">Adultos Mayores (60+ años):</span>
+                  <span id="demo-adulto-mayor" class="font-bold font-mono text-slate-800 dark:text-slate-200">12.457 (13.5%)</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-gradient-to-br from-blue-900 to-indigo-900 text-white rounded-2xl p-5 shadow-sm">
+              <h4 class="text-sm font-bold mb-2">📌 Hallazgo Demográfico</h4>
+              <p class="text-xs leading-relaxed text-blue-100">
+                El grupo más numeroso de la comuna de Lampa se concentra entre los <strong>30 y 39 años</strong> (15.595 personas en 2027), seguido del tramo de <strong>10 a 19 años</strong> (15.107 jóvenes), demostrando un perfil demográfico activo con alta demanda en salud materno-infantil y salud laboral.
+              </p>
+            </div>
+
+          </div>
+
+        </div>
+
+        <!-- Ciclos Vitales APS Chart -->
+        <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200/80 dark:border-slate-800">
+          <div class="flex items-start justify-between mb-4">
+            <div>
+              <h3 class="text-base font-bold text-slate-900 dark:text-white mb-1">
+                Distribución por Ciclo Vital en Atención Primaria (APS)
+              </h3>
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                Categorización estándar del Ministerio de Salud (MINSAL) para planificación de programas de salud
+              </p>
+            </div>
+            <button type="button" onclick="window.exportChartPNG('chart-ciclos-vitales', 'Distribución por Ciclo Vital en APS')" class="chart-export-btn p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition" title="Exportar gráfico en alta resolución PNG">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+            </button>
+          </div>
+          <div class="h-64 w-full">
+            <canvas id="chart-ciclos-vitales"></canvas>
+          </div>
+        <!-- Tabla Detallada por Grupo Etario (18 Grupos) -->
+        <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200/80 dark:border-slate-800">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-base font-bold text-slate-900 dark:text-white">
+                Distribución Detallada por Grupo Etario Quinquenal
+              </h3>
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                Población desagregada en los 18 grupos etarios oficiales según la selección actual
+              </p>
+            </div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left">
+              <thead class="bg-slate-50 dark:bg-slate-800/60 uppercase font-bold text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
+                <tr>
+                  <th class="px-4 py-3">Grupo Etario</th>
+                  <th class="px-4 py-3 text-right">Mujeres</th>
+                  <th class="px-4 py-3 text-right">Hombres</th>
+                  <th class="px-4 py-3 text-right">Total Grupo</th>
+                  <th class="px-4 py-3 text-right">% del Total</th>
+                  <th class="px-4 py-3 text-center w-48">Proporción H/M</th>
+                </tr>
+              </thead>
+              <tbody id="table-demografia-grupos-body" class="divide-y divide-slate-100 dark:divide-slate-800">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+      </div>
+
+      <!-- TAB 3: Tramos FONASA y Vulnerabilidad -->
+      <div id="tab-tramos" class="tab-content hidden space-y-6">
+        
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          
+          <!-- Stacked Bar Chart: Tramos por Centro -->
+          <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200/80 dark:border-slate-800">
+            <div class="flex items-start justify-between mb-4">
+              <div>
+                <h3 class="text-base font-bold text-slate-900 dark:text-white mb-1">
+                  Estructura de Tramos FONASA por Centro de Salud (100% Apilado)
+                </h3>
+                <p class="text-xs text-slate-500 dark:text-slate-400">
+                  Composición porcentual de niveles socioeconómicos y previsionales en cada centro
+                </p>
+              </div>
+              <button type="button" onclick="window.exportChartPNG('chart-tramos-centros-stacked', 'Estructura de Tramos FONASA por Centro')" class="chart-export-btn p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition" title="Exportar gráfico en alta resolución PNG">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+              </button>
+            </div>
+            <div class="h-80 w-full">
+              <canvas id="chart-tramos-centros-stacked"></canvas>
+            </div>
+          </div>
+
+          <!-- Bar Chart: Evolución Interanual de Tramos (2026 vs 2027) -->
+          <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200/80 dark:border-slate-800">
+            <div class="flex items-start justify-between mb-4">
+              <div>
+                <h3 class="text-base font-bold text-slate-900 dark:text-white mb-1">
+                  Evolución Interanual de Tramos (2026 vs 2027)
+                </h3>
+                <p class="text-xs text-slate-500 dark:text-slate-400">
+                  Comparativa del volumen de personas en cada tramo previsional
+                </p>
+              </div>
+              <button type="button" onclick="window.exportChartPNG('chart-tramos-evolucion', 'Evolución Interanual de Tramos FONASA')" class="chart-export-btn p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition" title="Exportar gráfico en alta resolución PNG">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+              </button>
+            </div>
+            <div class="h-80 w-full">
+              <canvas id="chart-tramos-evolucion"></canvas>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Descriptive Cards on Tramos FONASA -->
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+          
+          <div class="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
+            <div class="flex items-center space-x-2 mb-2">
+              <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
+              <h4 class="font-bold text-xs uppercase text-slate-700 dark:text-slate-300">Tramo A</h4>
+            </div>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mb-2">Personas carentes de recursos o causantes de subsidio familiar. 100% bonificación.</p>
+            <div id="stat-tramo-a" class="text-lg font-bold font-mono text-emerald-600 dark:text-emerald-400">31.264 (33.9%)</div>
+          </div>
+
+          <div class="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
+            <div class="flex items-center space-x-2 mb-2">
+              <span class="w-3 h-3 rounded-full bg-teal-500"></span>
+              <h4 class="font-bold text-xs uppercase text-slate-700 dark:text-slate-300">Tramo B</h4>
+            </div>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mb-2">Ingreso imponible mensual menor o igual al sueldo mínimo. Gratuidad institucional.</p>
+            <div id="stat-tramo-b" class="text-lg font-bold font-mono text-teal-600 dark:text-teal-400">25.220 (27.3%)</div>
+          </div>
+
+          <div class="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
+            <div class="flex items-center space-x-2 mb-2">
+              <span class="w-3 h-3 rounded-full bg-blue-500"></span>
+              <h4 class="font-bold text-xs uppercase text-slate-700 dark:text-slate-300">Tramo C</h4>
+            </div>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mb-2">Ingreso imponible entre 1 y 1.46 ingresos mínimos (o más de 3 cargas familiares).</p>
+            <div id="stat-tramo-c" class="text-lg font-bold font-mono text-blue-600 dark:text-blue-400">12.402 (13.4%)</div>
+          </div>
+
+          <div class="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
+            <div class="flex items-center space-x-2 mb-2">
+              <span class="w-3 h-3 rounded-full bg-indigo-500"></span>
+              <h4 class="font-bold text-xs uppercase text-slate-700 dark:text-slate-300">Tramo D</h4>
+            </div>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mb-2">Ingreso imponible superior a 1.46 ingresos mínimos (con hasta 2 cargas).</p>
+            <div id="stat-tramo-d" class="text-lg font-bold font-mono text-indigo-600 dark:text-indigo-400">19.123 (20.7%)</div>
+          </div>
+
+          <div class="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
+            <div class="flex items-center space-x-2 mb-2">
+              <span class="w-3 h-3 rounded-full bg-slate-400"></span>
+              <h4 class="font-bold text-xs uppercase text-slate-700 dark:text-slate-300">Tramo X</h4>
+            </div>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mb-2">Registros en regularización o trámite de acreditación previsional ante Fonasa.</p>
+            <div id="stat-tramo-x" class="text-lg font-bold font-mono text-slate-600 dark:text-slate-400">4.254 (4.6%)</div>
+          </div>
+
+        </div>
+
+        <!-- Detailed Breakdown Table for Tramos by Health Center -->
+        <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200/80 dark:border-slate-800">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-base font-bold text-slate-900 dark:text-white">
+                Distribución Detallada de Tramos FONASA por Establecimiento
+              </h3>
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                Población clasificada en cada tramo previsional y proporción de gratuidad institucional (A+B)
+              </p>
+            </div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left">
+              <thead class="bg-slate-50 dark:bg-slate-800/60 uppercase font-bold text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
+                <tr>
+                  <th class="px-3.5 py-2.5">Establecimiento</th>
+                  <th class="px-3.5 py-2.5 text-right">Total Validados</th>
+                  <th class="px-3.5 py-2.5 text-right text-emerald-600 dark:text-emerald-400">Tramo A</th>
+                  <th class="px-3.5 py-2.5 text-right text-teal-600 dark:text-teal-400">Tramo B</th>
+                  <th class="px-3.5 py-2.5 text-right text-blue-600 dark:text-blue-400">Tramo C</th>
+                  <th class="px-3.5 py-2.5 text-right text-indigo-600 dark:text-indigo-400">Tramo D</th>
+                  <th class="px-3.5 py-2.5 text-right text-slate-500">Tramo X</th>
+                  <th class="px-3.5 py-2.5 text-right font-bold">Vulnerabilidad (A+B)</th>
+                </tr>
+              </thead>
+              <tbody id="table-tramos-centros-body" class="divide-y divide-slate-100 dark:divide-slate-800">
+                <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                  <td class="px-3.5 py-2.5 font-semibold text-slate-800 dark:text-slate-200">CESFAM José Bauza Frau</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono font-bold text-slate-900 dark:text-white">48.948</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-emerald-600 dark:text-emerald-400 font-semibold">16.354</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-teal-600 dark:text-teal-400 font-semibold">13.298</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-blue-600 dark:text-blue-400 font-semibold">6.612</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-indigo-600 dark:text-indigo-400 font-semibold">10.384</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-slate-500 font-semibold">2.300</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono font-bold text-teal-700 dark:text-teal-300">60.6%</td>
+                </tr>
+                <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                  <td class="px-3.5 py-2.5 font-semibold text-slate-800 dark:text-slate-200">CESFAM Batuco</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono font-bold text-slate-900 dark:text-white">17.130</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-emerald-600 dark:text-emerald-400 font-semibold">5.820</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-teal-600 dark:text-teal-400 font-semibold">4.750</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-blue-600 dark:text-blue-400 font-semibold">2.340</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-indigo-600 dark:text-indigo-400 font-semibold">3.490</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-slate-500 font-semibold">730</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono font-bold text-teal-700 dark:text-teal-300">61.7%</td>
+                </tr>
+                <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                  <td class="px-3.5 py-2.5 font-semibold text-slate-800 dark:text-slate-200">PSR Juan Pablo II de Lampa</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono font-bold text-slate-900 dark:text-white">11.314</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-emerald-600 dark:text-emerald-400 font-semibold">4.010</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-teal-600 dark:text-teal-400 font-semibold">3.120</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-blue-600 dark:text-blue-400 font-semibold">1.490</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-indigo-600 dark:text-indigo-400 font-semibold">2.210</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-slate-500 font-semibold">484</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono font-bold text-teal-700 dark:text-teal-300">63.0%</td>
+                </tr>
+                <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                  <td class="px-3.5 py-2.5 font-semibold text-slate-800 dark:text-slate-200">CECOSF Sol de Septiembre</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono font-bold text-slate-900 dark:text-white">7.564</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-emerald-600 dark:text-emerald-400 font-semibold">2.610</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-teal-600 dark:text-teal-400 font-semibold">2.080</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-blue-600 dark:text-blue-400 font-semibold">990</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-indigo-600 dark:text-indigo-400 font-semibold">1.540</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-slate-500 font-semibold">344</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono font-bold text-teal-700 dark:text-teal-300">62.0%</td>
+                </tr>
+                <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                  <td class="px-3.5 py-2.5 font-semibold text-slate-800 dark:text-slate-200">CECOSF Batuco</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono font-bold text-slate-900 dark:text-white">7.307</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-emerald-600 dark:text-emerald-400 font-semibold">2.470</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-teal-600 dark:text-teal-400 font-semibold">1.972</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-blue-600 dark:text-blue-400 font-semibold">970</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-indigo-600 dark:text-indigo-400 font-semibold">1.499</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-slate-500 font-semibold">396</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono font-bold text-teal-700 dark:text-teal-300">60.8%</td>
+                </tr>
+                <tr class="bg-slate-100/90 dark:bg-slate-800/90 font-extrabold text-slate-900 dark:text-white border-t-2 border-slate-300 dark:border-slate-700">
+                  <td class="px-3.5 py-3 uppercase">Total Comunal Lampa</td>
+                  <td class="px-3.5 py-3 text-right font-mono">92.263</td>
+                  <td class="px-3.5 py-3 text-right font-mono text-emerald-600 dark:text-emerald-400">31.264</td>
+                  <td class="px-3.5 py-3 text-right font-mono text-teal-600 dark:text-teal-400">25.220</td>
+                  <td class="px-3.5 py-3 text-right font-mono text-blue-600 dark:text-blue-400">12.402</td>
+                  <td class="px-3.5 py-3 text-right font-mono text-indigo-600 dark:text-indigo-400">19.123</td>
+                  <td class="px-3.5 py-3 text-right font-mono text-slate-500">4.254</td>
+                  <td class="px-3.5 py-3 text-right font-mono text-teal-700 dark:text-teal-300">61.2%</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- TAB 4: Migración, Etnias e Inclusión -->
+      <div id="tab-inclusion" class="tab-content hidden space-y-6">
+        
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          
+          <!-- Bar Chart: Top Países Migrantes -->
+          <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200/80 dark:border-slate-800">
+            <div class="flex items-start justify-between mb-4">
+              <div>
+                <h3 class="text-base font-bold text-slate-900 dark:text-white mb-1">
+                  Top Países de Origen de Población Migrante
+                </h3>
+                <p class="text-xs text-slate-500 dark:text-slate-400">
+                  Nacionalidades extranjeras con mayor cantidad de personas inscritas y validadas
+                </p>
+              </div>
+              <button type="button" onclick="window.exportChartPNG('chart-migrantes-naciones', 'Top Países de Origen de Población Migrante')" class="chart-export-btn p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition" title="Exportar gráfico en alta resolución PNG">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+              </button>
+            </div>
+            <div class="h-80 w-full">
+              <canvas id="chart-migrantes-naciones"></canvas>
+            </div>
+          </div>
+
+          <!-- Bar Chart: Pueblos Originarios y Etnias -->
+          <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200/80 dark:border-slate-800">
+            <div class="flex items-start justify-between mb-4">
+              <div>
+                <h3 class="text-base font-bold text-slate-900 dark:text-white mb-1">
+                  Población de Pueblos Originarios Registrada
+                </h3>
+                <p class="text-xs text-slate-500 dark:text-slate-400">
+                  Pertenencia a pueblos originarios reconocidos por la Ley Indígena
+                </p>
+              </div>
+              <button type="button" onclick="window.exportChartPNG('chart-etnias', 'Población de Pueblos Originarios')" class="chart-export-btn p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition" title="Exportar gráfico en alta resolución PNG">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+              </button>
+            </div>
+            <div class="h-80 w-full">
+              <canvas id="chart-etnias"></canvas>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Special Programs (PRAIS, Discapacidad, Cuidadores) Breakdown -->
+        <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200/80 dark:border-slate-800">
+          <div class="flex items-start justify-between mb-4">
+            <div>
+              <h3 class="text-base font-bold text-slate-900 dark:text-white mb-1">
+                Distribución Territorial de Programas Prioritarios por Centro
+              </h3>
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                Comparativa de beneficiarios PRAIS, personas en situación de discapacidad y cuidadores acreditados
+              </p>
+            </div>
+            <button type="button" onclick="window.exportChartPNG('chart-programas-centros', 'Distribución Territorial de Programas Prioritarios')" class="chart-export-btn p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition" title="Exportar gráfico en alta resolución PNG">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+            </button>
+          </div>
+          <div class="h-72 w-full">
+            <canvas id="chart-programas-centros"></canvas>
+          </div>
+        </div>
+
+        <!-- Detailed Breakdown Table for Migration and Priority Programs -->
+        <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200/80 dark:border-slate-800">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-base font-bold text-slate-900 dark:text-white">
+                Distribución Territorial de Migración, Etnias y Programas por Establecimiento
+              </h3>
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                Resumen comunal de personas migrantes, pertenecientes a pueblos originarios, PRAIS, discapacidad y cuidadores
+              </p>
+            </div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left">
+              <thead class="bg-slate-50 dark:bg-slate-800/60 uppercase font-bold text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
+                <tr>
+                  <th class="px-3.5 py-2.5">Establecimiento</th>
+                  <th class="px-3.5 py-2.5 text-right">Total Inscritos</th>
+                  <th class="px-3.5 py-2.5 text-right text-indigo-600 dark:text-indigo-400">Migrantes</th>
+                  <th class="px-3.5 py-2.5 text-right font-bold">% Migrante</th>
+                  <th class="px-3.5 py-2.5 text-right text-amber-600 dark:text-amber-400">P. Originarios</th>
+                  <th class="px-3.5 py-2.5 text-right text-purple-600 dark:text-purple-400">PRAIS</th>
+                  <th class="px-3.5 py-2.5 text-right text-blue-600 dark:text-blue-400">Discapacidad</th>
+                  <th class="px-3.5 py-2.5 text-right text-emerald-600 dark:text-emerald-400">Cuidadores</th>
+                </tr>
+              </thead>
+              <tbody id="table-inclusion-centros-body" class="divide-y divide-slate-100 dark:divide-slate-800">
+                <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                  <td class="px-3.5 py-2.5 font-semibold text-slate-800 dark:text-slate-200">CESFAM José Bauza Frau</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono font-bold text-slate-900 dark:text-white">48.948</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-indigo-600 dark:text-indigo-400 font-semibold">6.240</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono font-bold text-indigo-700 dark:text-indigo-300">12.7%</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-amber-600 dark:text-amber-400 font-semibold">1.120</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-purple-600 dark:text-purple-400 font-semibold">690</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-blue-600 dark:text-blue-400 font-semibold">720</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-emerald-600 dark:text-emerald-400 font-semibold">150</td>
+                </tr>
+                <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                  <td class="px-3.5 py-2.5 font-semibold text-slate-800 dark:text-slate-200">CESFAM Batuco</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono font-bold text-slate-900 dark:text-white">17.130</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-indigo-600 dark:text-indigo-400 font-semibold">1.890</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono font-bold text-indigo-700 dark:text-indigo-300">11.0%</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-amber-600 dark:text-amber-400 font-semibold">390</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-purple-600 dark:text-purple-400 font-semibold">240</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-blue-600 dark:text-blue-400 font-semibold">250</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-emerald-600 dark:text-emerald-400 font-semibold">50</td>
+                </tr>
+                <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                  <td class="px-3.5 py-2.5 font-semibold text-slate-800 dark:text-slate-200">PSR Juan Pablo II de Lampa</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono font-bold text-slate-900 dark:text-white">11.314</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-indigo-600 dark:text-indigo-400 font-semibold">1.410</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono font-bold text-indigo-700 dark:text-indigo-300">12.5%</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-amber-600 dark:text-amber-400 font-semibold">260</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-purple-600 dark:text-purple-400 font-semibold">160</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-blue-600 dark:text-blue-400 font-semibold">170</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-emerald-600 dark:text-emerald-400 font-semibold">35</td>
+                </tr>
+                <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                  <td class="px-3.5 py-2.5 font-semibold text-slate-800 dark:text-slate-200">CECOSF Sol de Septiembre</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono font-bold text-slate-900 dark:text-white">7.564</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-indigo-600 dark:text-indigo-400 font-semibold">730</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono font-bold text-indigo-700 dark:text-indigo-300">9.7%</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-amber-600 dark:text-amber-400 font-semibold">160</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-purple-600 dark:text-purple-400 font-semibold">90</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-blue-600 dark:text-blue-400 font-semibold">105</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-emerald-600 dark:text-emerald-400 font-semibold">22</td>
+                </tr>
+                <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                  <td class="px-3.5 py-2.5 font-semibold text-slate-800 dark:text-slate-200">CECOSF Batuco</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono font-bold text-slate-900 dark:text-white">7.307</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-indigo-600 dark:text-indigo-400 font-semibold">683</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono font-bold text-indigo-700 dark:text-indigo-300">9.3%</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-amber-600 dark:text-amber-400 font-semibold">150</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-purple-600 dark:text-purple-400 font-semibold">74</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-blue-600 dark:text-blue-400 font-semibold">83</td>
+                  <td class="px-3.5 py-2.5 text-right font-mono text-emerald-600 dark:text-emerald-400 font-semibold">16</td>
+                </tr>
+                <tr class="bg-slate-100/90 dark:bg-slate-800/90 font-extrabold text-slate-900 dark:text-white border-t-2 border-slate-300 dark:border-slate-700">
+                  <td class="px-3.5 py-3 uppercase">Total Comunal Lampa</td>
+                  <td class="px-3.5 py-3 text-right font-mono">92.263</td>
+                  <td class="px-3.5 py-3 text-right font-mono text-indigo-600 dark:text-indigo-400">10.953</td>
+                  <td class="px-3.5 py-3 text-right font-mono text-indigo-700 dark:text-indigo-300">11.9%</td>
+                  <td class="px-3.5 py-3 text-right font-mono text-amber-600 dark:text-amber-400">2.080</td>
+                  <td class="px-3.5 py-3 text-right font-mono text-purple-600 dark:text-purple-400">1.254</td>
+                  <td class="px-3.5 py-3 text-right font-mono text-blue-600 dark:text-blue-400">1.328</td>
+                  <td class="px-3.5 py-3 text-right font-mono text-emerald-600 dark:text-emerald-400">273</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- TAB: Simulador Financiero Per Cápita -->
+      <div id="tab-simulador" class="tab-content hidden space-y-6">
+        
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          <!-- Parameters Card -->
+          <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200/80 dark:border-slate-800 space-y-4">
+            <div>
+              <h3 class="text-base font-bold text-slate-900 dark:text-white">
+                Parámetros de Financiamiento Per Cápita
+              </h3>
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                Ajusta los valores oficiales MINSAL/FONASA para calcular el presupuesto comunal
+              </p>
+            </div>
+
+            <div class="space-y-3.5 text-xs">
+              <div>
+                <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Valor Per Cápita Basal Mensual (CLP)
+                </label>
+                <div class="relative">
+                  <span class="absolute left-3 top-2 text-slate-400 font-mono font-bold">$</span>
+                  <input type="number" id="sim-basal" oninput="updateSimuladorCalculations()" onchange="updateSimuladorCalculations()" value="11350" step="50" class="w-full pl-7 pr-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono font-bold text-slate-800 dark:text-slate-100">
+                </div>
+                <span class="text-[11px] text-slate-400">Valor referencial Ley de Presupuestos APS</span>
+              </div>
+
+              <div>
+                <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Indexador Comunal de Pobreza / Vulnerabilidad
+                </label>
+                <input type="number" id="sim-index-pobreza" value="1.08" step="0.01" min="1.0" max="1.3" class="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono font-bold text-slate-800 dark:text-slate-100">
+                <span class="text-[11px] text-slate-400">Factor según Ficha de Protección Social / CASEN</span>
+              </div>
+
+              <div>
+                <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Indexador de Ruralidad / Dificultad de Desempeño
+                </label>
+                <input type="number" id="sim-index-rural" value="1.04" step="0.01" min="1.0" max="1.25" class="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-mono font-bold text-slate-800 dark:text-slate-100">
+                <span class="text-[11px] text-slate-400">Factor por dispersión geográfica comunal</span>
+              </div>
+
+              <div class="pt-2 border-t border-slate-100 dark:border-slate-800">
+                <div class="flex justify-between items-center text-xs">
+                  <span class="font-semibold text-slate-600 dark:text-slate-400">Valor Final Indexado/persona:</span>
+                  <strong id="sim-val-indexado" class="font-mono text-base text-blue-600 dark:text-blue-400">$12.748</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Impact Summary KPI Cards -->
+          <div class="lg:col-span-2 space-y-4">
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Presupuesto Anual Estimado 2026</span>
+                <div id="sim-presupuesto-2026" class="text-2xl sm:text-3xl font-extrabold font-mono text-slate-800 dark:text-slate-200 mt-1">
+                  $13.620.000.000
+                </div>
+                <span class="text-xs text-slate-400 font-mono">Basado en 89.036 validados</span>
+              </div>
+
+              <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm">
+                <span class="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Presupuesto Anual Estimado 2027</span>
+                <div id="sim-presupuesto-2027" class="text-2xl sm:text-3xl font-extrabold font-mono text-blue-600 dark:text-blue-400 mt-1">
+                  $14.113.000.000
+                </div>
+                <span class="text-xs text-slate-400 font-mono">Basado en 92.263 validados</span>
+              </div>
+            </div>
+
+            <!-- Net Increase Banner -->
+            <div class="bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-2xl p-5 shadow-sm">
+              <div class="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <span class="text-xs uppercase font-bold text-emerald-200 tracking-wider">Incremento Presupuestario Neto para Lampa</span>
+                  <div id="sim-incremento-neto" class="text-3xl sm:text-4xl font-extrabold font-mono mt-1">
+                    +$493.630.000 CLP / año
+                  </div>
+                  <p class="text-xs text-emerald-100 mt-1">
+                    Fondos adicionales generados por los <strong>+3.227 nuevos inscritos validados</strong> en el proceso 2027.
+                  </p>
+                </div>
+                <div class="text-right">
+                  <span class="text-xs text-emerald-200">Mensual Adicional:</span>
+                  <div id="sim-incremento-mensual" class="text-xl font-bold font-mono">+$41.135.000/mes</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Health Center Projected Allocation Table -->
+            <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm">
+              <h4 class="text-sm font-bold text-slate-900 dark:text-white mb-3">
+                Distribución Estimada por Establecimiento de Salud
+              </h4>
+              <div class="overflow-x-auto">
+                <table class="w-full text-xs text-left">
+                  <thead class="bg-slate-50 dark:bg-slate-800/60 uppercase font-bold text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
+                    <tr>
+                      <th class="px-3.5 py-2.5">Centro</th>
+                      <th class="px-3.5 py-2.5 text-right">Validados '27</th>
+                      <th class="px-3.5 py-2.5 text-right">Presupuesto Mensual</th>
+                      <th class="px-3.5 py-2.5 text-right">Presupuesto Anual</th>
+                      <th class="px-3.5 py-2.5 text-right">Incremento Anual vs '26</th>
+                    </tr>
+                  </thead>
+                  <tbody id="table-sim-centros-body" class="divide-y divide-slate-100 dark:divide-slate-800">
+                    <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                      <td class="px-3.5 py-2.5 font-semibold text-slate-800 dark:text-slate-200">CESFAM José Bauza Frau</td>
+                      <td class="px-3.5 py-2.5 text-right font-mono font-bold text-slate-900 dark:text-white">48.948</td>
+                      <td class="px-3.5 py-2.5 text-right font-mono text-slate-600 dark:text-slate-300">$623.989.104</td>
+                      <td class="px-3.5 py-2.5 text-right font-mono font-bold text-blue-600 dark:text-blue-400">$7.487.869.248</td>
+                      <td class="px-3.5 py-2.5 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">+$246.548.304</td>
+                    </tr>
+                    <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                      <td class="px-3.5 py-2.5 font-semibold text-slate-800 dark:text-slate-200">CESFAM Batuco</td>
+                      <td class="px-3.5 py-2.5 text-right font-mono font-bold text-slate-900 dark:text-white">17.130</td>
+                      <td class="px-3.5 py-2.5 text-right font-mono text-slate-600 dark:text-slate-300">$218.373.240</td>
+                      <td class="px-3.5 py-2.5 text-right font-mono font-bold text-blue-600 dark:text-blue-400">$2.620.478.880</td>
+                      <td class="px-3.5 py-2.5 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">+$42.373.440</td>
+                    </tr>
+                    <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                      <td class="px-3.5 py-2.5 font-semibold text-slate-800 dark:text-slate-200">PSR Juan Pablo II de Lampa</td>
+                      <td class="px-3.5 py-2.5 text-right font-mono font-bold text-slate-900 dark:text-white">11.314</td>
+                      <td class="px-3.5 py-2.5 text-right font-mono text-slate-600 dark:text-slate-300">$144.230.872</td>
+                      <td class="px-3.5 py-2.5 text-right font-mono font-bold text-blue-600 dark:text-blue-400">$1.730.770.464</td>
+                      <td class="px-3.5 py-2.5 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">+$78.145.248</td>
+                    </tr>
+                    <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                      <td class="px-3.5 py-2.5 font-semibold text-slate-800 dark:text-slate-200">CECOSF Sol de Septiembre</td>
+                      <td class="px-3.5 py-2.5 text-right font-mono font-bold text-slate-900 dark:text-white">7.564</td>
+                      <td class="px-3.5 py-2.5 text-right font-mono text-slate-600 dark:text-slate-300">$96.425.872</td>
+                      <td class="px-3.5 py-2.5 text-right font-mono font-bold text-blue-600 dark:text-blue-400">$1.157.110.464</td>
+                      <td class="px-3.5 py-2.5 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">+$92.066.304</td>
+                    </tr>
+                    <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                      <td class="px-3.5 py-2.5 font-semibold text-slate-800 dark:text-slate-200">CECOSF Batuco</td>
+                      <td class="px-3.5 py-2.5 text-right font-mono font-bold text-slate-900 dark:text-white">7.307</td>
+                      <td class="px-3.5 py-2.5 text-right font-mono text-slate-600 dark:text-slate-300">$93.150.236</td>
+                      <td class="px-3.5 py-2.5 text-right font-mono font-bold text-blue-600 dark:text-blue-400">$1.117.802.832</td>
+                      <td class="px-3.5 py-2.5 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">+$34.425.096</td>
+                    </tr>
+                    <tr class="bg-slate-100/90 dark:bg-slate-800/90 font-extrabold text-slate-900 dark:text-white border-t-2 border-slate-300 dark:border-slate-700">
+                      <td class="px-3.5 py-3 uppercase">Total Comunal Lampa</td>
+                      <td class="px-3.5 py-3 text-right font-mono">92.263</td>
+                      <td class="px-3.5 py-3 text-right font-mono text-slate-700 dark:text-slate-200">$1.176.169.324</td>
+                      <td class="px-3.5 py-3 text-right font-mono text-blue-600 dark:text-blue-400">$14.114.031.888</td>
+                      <td class="px-3.5 py-3 text-right font-mono text-emerald-600 dark:text-emerald-400">+$493.558.392</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- TAB 5: Explorador de Datos y Exportación -->
+      <div id="tab-datos" class="tab-content hidden space-y-4">
+        
+        <!-- Table Controls & Search Bar -->
+        <div class="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-200/80 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4">
+          
+          <div class="flex items-center space-x-3 w-full sm:w-auto flex-1 max-w-md">
+            <div class="relative w-full">
+              <input type="text" id="table-search-input" placeholder="Buscar por centro, nacionalidad, sector, tramo..." class="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium focus:ring-2 focus:ring-blue-500 text-slate-800 dark:text-slate-100">
+              <svg class="w-4 h-4 text-slate-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+              </svg>
+            </div>
+          </div>
+
+          <div class="flex items-center space-x-3 text-xs">
+            <div class="flex items-center space-x-1.5">
+              <span class="text-slate-500 font-medium">Filas por página:</span>
+              <select id="table-page-size" class="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md px-2 py-1 font-semibold text-slate-700 dark:text-slate-200">
+                <option value="15">15</option>
+                <option value="25" selected>25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </select>
+            </div>
+
+            <!-- Export to CSV Button -->
+            <button id="btn-export-csv" onclick="exportFilteredCSV()" class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+              <span>Exportar Selección (CSV)</span>
+            </button>
+          </div>
+
+        </div>
+
+        <!-- Dynamic Data Table -->
+        <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-800 overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left">
+              <thead class="bg-slate-50 dark:bg-slate-800/80 uppercase font-bold text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
+                <tr>
+                  <th class="px-3.5 py-3">Año</th>
+                  <th class="px-3.5 py-3">Establecimiento</th>
+                  <th class="px-3.5 py-3">Sector</th>
+                  <th class="px-3.5 py-3">Género</th>
+                  <th class="px-3.5 py-3 text-right">Edad</th>
+                  <th class="px-3.5 py-3 text-center">Tramo</th>
+                  <th class="px-3.5 py-3">Nacionalidad</th>
+                  <th class="px-3.5 py-3">Etnia</th>
+                  <th class="px-3.5 py-3 text-center">PRAIS</th>
+                  <th class="px-3.5 py-3 text-center">Discapacidad</th>
+                  <th class="px-3.5 py-3 text-center">Cuidador</th>
+                </tr>
+              </thead>
+              <tbody id="raw-data-table-body" class="divide-y divide-slate-100 dark:divide-slate-800">
+                <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                  <td class="px-3.5 py-2.5 font-mono font-semibold">2027</td>
+                  <td class="px-3.5 py-2.5 max-w-[200px] truncate" title="Posta de Salud Rural Juan Pablo II de Lampa">Posta de Salud Rural Juan Pablo II de Lampa</td>
+                  <td class="px-3.5 py-2.5 text-slate-600 dark:text-slate-400">Sin Datos</td>
+                  <td class="px-3.5 py-2.5"><span class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold bg-pink-100 text-pink-700 dark:bg-pink-950 dark:text-pink-300">MUJER</span></td>
+                  <td class="px-3.5 py-2.5 text-right font-mono">15</td>
+                  <td class="px-3.5 py-2.5 text-center"><span class="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold font-mono bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">D</span></td>
+                  <td class="px-3.5 py-2.5">Chile</td>
+                  <td class="px-3.5 py-2.5 text-slate-500">No tiene</td>
+                  <td class="px-3.5 py-2.5 text-center">-</td>
+                  <td class="px-3.5 py-2.5 text-center">-</td>
+                  <td class="px-3.5 py-2.5 text-center">-</td>
+                </tr>
+                <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                  <td class="px-3.5 py-2.5 font-mono font-semibold">2027</td>
+                  <td class="px-3.5 py-2.5 max-w-[200px] truncate" title="Posta de Salud Rural Juan Pablo II de Lampa">Posta de Salud Rural Juan Pablo II de Lampa</td>
+                  <td class="px-3.5 py-2.5 text-slate-600 dark:text-slate-400">Sin Datos</td>
+                  <td class="px-3.5 py-2.5"><span class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold bg-pink-100 text-pink-700 dark:bg-pink-950 dark:text-pink-300">MUJER</span></td>
+                  <td class="px-3.5 py-2.5 text-right font-mono">37</td>
+                  <td class="px-3.5 py-2.5 text-center"><span class="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold font-mono bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300">B</span></td>
+                  <td class="px-3.5 py-2.5">Chile</td>
+                  <td class="px-3.5 py-2.5 text-slate-500">No tiene</td>
+                  <td class="px-3.5 py-2.5 text-center">-</td>
+                  <td class="px-3.5 py-2.5 text-center">-</td>
+                  <td class="px-3.5 py-2.5 text-center">-</td>
+                </tr>
+                <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                  <td class="px-3.5 py-2.5 font-mono font-semibold">2027</td>
+                  <td class="px-3.5 py-2.5 max-w-[200px] truncate" title="Posta de Salud Rural Juan Pablo II de Lampa">Posta de Salud Rural Juan Pablo II de Lampa</td>
+                  <td class="px-3.5 py-2.5 text-slate-600 dark:text-slate-400">Sin Datos</td>
+                  <td class="px-3.5 py-2.5"><span class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300">HOMBRE</span></td>
+                  <td class="px-3.5 py-2.5 text-right font-mono">12</td>
+                  <td class="px-3.5 py-2.5 text-center"><span class="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold font-mono bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">D</span></td>
+                  <td class="px-3.5 py-2.5">Chile</td>
+                  <td class="px-3.5 py-2.5 text-slate-500">No tiene</td>
+                  <td class="px-3.5 py-2.5 text-center">-</td>
+                  <td class="px-3.5 py-2.5 text-center">-</td>
+                  <td class="px-3.5 py-2.5 text-center">-</td>
+                </tr>
+                <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                  <td class="px-3.5 py-2.5 font-mono font-semibold">2027</td>
+                  <td class="px-3.5 py-2.5 max-w-[200px] truncate" title="Posta de Salud Rural Juan Pablo II de Lampa">Posta de Salud Rural Juan Pablo II de Lampa</td>
+                  <td class="px-3.5 py-2.5 text-slate-600 dark:text-slate-400">Sin Datos</td>
+                  <td class="px-3.5 py-2.5"><span class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold bg-pink-100 text-pink-700 dark:bg-pink-950 dark:text-pink-300">MUJER</span></td>
+                  <td class="px-3.5 py-2.5 text-right font-mono">11</td>
+                  <td class="px-3.5 py-2.5 text-center"><span class="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold font-mono bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">D</span></td>
+                  <td class="px-3.5 py-2.5">Chile</td>
+                  <td class="px-3.5 py-2.5 text-slate-500">Otro (Especificar)</td>
+                  <td class="px-3.5 py-2.5 text-center">-</td>
+                  <td class="px-3.5 py-2.5 text-center">-</td>
+                  <td class="px-3.5 py-2.5 text-center">-</td>
+                </tr>
+                <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                  <td class="px-3.5 py-2.5 font-mono font-semibold">2027</td>
+                  <td class="px-3.5 py-2.5 max-w-[200px] truncate" title="Posta de Salud Rural Juan Pablo II de Lampa">Posta de Salud Rural Juan Pablo II de Lampa</td>
+                  <td class="px-3.5 py-2.5 text-slate-600 dark:text-slate-400">Sin Datos</td>
+                  <td class="px-3.5 py-2.5"><span class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300">HOMBRE</span></td>
+                  <td class="px-3.5 py-2.5 text-right font-mono">41</td>
+                  <td class="px-3.5 py-2.5 text-center"><span class="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold font-mono bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">D</span></td>
+                  <td class="px-3.5 py-2.5">Chile</td>
+                  <td class="px-3.5 py-2.5 text-slate-500">No tiene</td>
+                  <td class="px-3.5 py-2.5 text-center">-</td>
+                  <td class="px-3.5 py-2.5 text-center">-</td>
+                  <td class="px-3.5 py-2.5 text-center">-</td>
+                </tr>
+                <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                  <td class="px-3.5 py-2.5 font-mono font-semibold">2027</td>
+                  <td class="px-3.5 py-2.5 max-w-[200px] truncate" title="Posta de Salud Rural Juan Pablo II de Lampa">Posta de Salud Rural Juan Pablo II de Lampa</td>
+                  <td class="px-3.5 py-2.5 text-slate-600 dark:text-slate-400">Sin Datos</td>
+                  <td class="px-3.5 py-2.5"><span class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300">HOMBRE</span></td>
+                  <td class="px-3.5 py-2.5 text-right font-mono">69</td>
+                  <td class="px-3.5 py-2.5 text-center"><span class="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold font-mono bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300">B</span></td>
+                  <td class="px-3.5 py-2.5">Chile</td>
+                  <td class="px-3.5 py-2.5 text-slate-500">No tiene</td>
+                  <td class="px-3.5 py-2.5 text-center">-</td>
+                  <td class="px-3.5 py-2.5 text-center">-</td>
+                  <td class="px-3.5 py-2.5 text-center">-</td>
+                </tr>
+                <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                  <td class="px-3.5 py-2.5 font-mono font-semibold">2027</td>
+                  <td class="px-3.5 py-2.5 max-w-[200px] truncate" title="Posta de Salud Rural Juan Pablo II de Lampa">Posta de Salud Rural Juan Pablo II de Lampa</td>
+                  <td class="px-3.5 py-2.5 text-slate-600 dark:text-slate-400">Sin Datos</td>
+                  <td class="px-3.5 py-2.5"><span class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold bg-pink-100 text-pink-700 dark:bg-pink-950 dark:text-pink-300">MUJER</span></td>
+                  <td class="px-3.5 py-2.5 text-right font-mono">25</td>
+                  <td class="px-3.5 py-2.5 text-center"><span class="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold font-mono bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">A</span></td>
+                  <td class="px-3.5 py-2.5">Chile</td>
+                  <td class="px-3.5 py-2.5 text-slate-500">No tiene</td>
+                  <td class="px-3.5 py-2.5 text-center">-</td>
+                  <td class="px-3.5 py-2.5 text-center">-</td>
+                  <td class="px-3.5 py-2.5 text-center">-</td>
+                </tr>
+                <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                  <td class="px-3.5 py-2.5 font-mono font-semibold">2027</td>
+                  <td class="px-3.5 py-2.5 max-w-[200px] truncate" title="Posta de Salud Rural Juan Pablo II de Lampa">Posta de Salud Rural Juan Pablo II de Lampa</td>
+                  <td class="px-3.5 py-2.5 text-slate-600 dark:text-slate-400">Sin Datos</td>
+                  <td class="px-3.5 py-2.5"><span class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300">HOMBRE</span></td>
+                  <td class="px-3.5 py-2.5 text-right font-mono">10</td>
+                  <td class="px-3.5 py-2.5 text-center"><span class="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold font-mono bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">A</span></td>
+                  <td class="px-3.5 py-2.5">Chile</td>
+                  <td class="px-3.5 py-2.5 text-slate-500">No tiene</td>
+                  <td class="px-3.5 py-2.5 text-center">-</td>
+                  <td class="px-3.5 py-2.5 text-center">-</td>
+                  <td class="px-3.5 py-2.5 text-center">-</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination Bar -->
+          <div class="p-3.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+            <span id="table-pagination-info">Mostrando página 1 de 1</span>
+            <div class="flex items-center space-x-1.5">
+              <button id="btn-page-first" class="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-40">«</button>
+              <button id="btn-page-prev" class="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-40">‹ Anterior</button>
+              <span id="table-page-number" class="px-3 font-semibold text-slate-800 dark:text-slate-200 font-mono">1</span>
+              <button id="btn-page-next" class="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-40">Siguiente ›</button>
+              <button id="btn-page-last" class="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-40">»</button>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 py-4 mt-8 text-center text-xs text-slate-500 dark:text-slate-400">
+      <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+        <p>
+          Observatorio de Población Validada FONASA • Red de Salud Municipal de Lampa
+        </p>
+        <p class="text-[11px] text-slate-400">
+          Fuente de datos: Google Sheets Oficial FONASA • Procesos 2026 y 2027
+        </p>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- Modal: Ficha Ejecutiva por Centro -->
+  <div id="modal-ficha-centro" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/75 backdrop-blur-sm hidden overflow-y-auto">
+    <div id="modal-ficha-dialog" class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-4xl w-full my-auto overflow-hidden flex flex-col max-h-[92vh]">
+      
+      <!-- Modal Toolbar / Controls (Hidden in Print) -->
+      <div id="modal-ficha-controls" class="p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/80 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center space-x-2">
+          <div class="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/60 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold">
+            🏛️
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-slate-900 dark:text-white">
+              Ficha Ejecutiva de Establecimiento de Salud
+            </h3>
+            <p class="text-[11px] text-slate-500 dark:text-slate-400">
+              Perfil sociodemográfico, vulnerabilidad y focos estratégicos APS
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2.5">
+          <!-- Center Selector -->
+          <select id="select-ficha-center" class="text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-1.5 font-semibold text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 shadow-sm">
+            <option value="Centro de Salud Familiar  José Bauza Frau">CESFAM José Bauza Frau</option>
+            <option value="Centro de Salud Familiar Batuco">CESFAM Batuco</option>
+            <option value="Posta de Salud Rural Juan Pablo II de Lampa">Posta Juan Pablo II de Lampa</option>
+            <option value="Centro Comunitario de Salud Familiar Sol de Septiembre">CECOSF Sol de Septiembre</option>
+            <option value="Centro Comunitario de Salud Familiar Batuco">CECOSF Batuco</option>
+          </select>
+
+          <!-- Print / Export PDF -->
+          <button id="btn-print-ficha" title="Imprimir ficha o guardar como PDF" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+            </svg>
+            <span>Imprimir / PDF</span>
+          </button>
+
+          <!-- Close Modal -->
+          <button id="btn-close-ficha" class="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition" title="Cerrar ventana">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Printable Area -->
+      <div id="ficha-printable-area" class="p-6 overflow-y-auto space-y-6 text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-900">
+        <!-- Dynamically rendered by app.js renderFichaContent() -->
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Toast Notification for Exports and Actions -->
+  <div id="toast-notification" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-xl border border-slate-700 dark:border-slate-300 text-xs font-semibold">
+    <span id="toast-icon">📥</span>
+    <span id="toast-message">Gráfico exportado exitosamente</span>
+  </div>
+
+    <!-- Application Logic Script -->
+  <script src="app.js"></script>
+</body>
+</html>

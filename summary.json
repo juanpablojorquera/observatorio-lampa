@@ -1,0 +1,357 @@
+{
+  "total_rows": 181299,
+  "years": {
+    "2026": {
+      "total": 89036,
+      "mujeres": 46616,
+      "hombres": 42411,
+      "intersex": 9,
+      "tramos": {
+        "D": 18549,
+        "C": 13414,
+        "A": 23066,
+        "B": 29439,
+        "X": 4568
+      },
+      "pyramid": {
+        "Menos de 1 año": {
+          "M": 386,
+          "H": 395
+        },
+        "1 - 4 años": {
+          "M": 2339,
+          "H": 2330
+        },
+        "5 - 9 años": {
+          "M": 3627,
+          "H": 3772
+        },
+        "10 - 14 años": {
+          "M": 3606,
+          "H": 3721
+        },
+        "15 - 19 años": {
+          "M": 3509,
+          "H": 3523
+        },
+        "20 - 24 años": {
+          "M": 3432,
+          "H": 3121
+        },
+        "25 - 29 años": {
+          "M": 3738,
+          "H": 3159
+        },
+        "30 - 34 años": {
+          "M": 4321,
+          "H": 3393
+        },
+        "35 - 39 años": {
+          "M": 4012,
+          "H": 3315
+        },
+        "40 - 44 años": {
+          "M": 3336,
+          "H": 2853
+        },
+        "45 - 49 años": {
+          "M": 2817,
+          "H": 2383
+        },
+        "50 - 54 años": {
+          "M": 2657,
+          "H": 2421
+        },
+        "55 - 59 años": {
+          "M": 2340,
+          "H": 2152
+        },
+        "60 - 64 años": {
+          "M": 2068,
+          "H": 1999
+        },
+        "65 - 69 años": {
+          "M": 1682,
+          "H": 1534
+        },
+        "70 - 74 años": {
+          "M": 1076,
+          "H": 1030
+        },
+        "75 - 79 años": {
+          "M": 747,
+          "H": 657
+        },
+        "80 y mas años": {
+          "M": 923,
+          "H": 653
+        }
+      },
+      "centers": {
+        "Centro de Salud Familiar  José Bauza Frau": 47336,
+        "Centro Comunitario de Salud Familiar Batuco": 7082,
+        "Centro Comunitario de Salud Familiar Sol de Septiembre": 6962,
+        "Posta de Salud Rural Juan Pablo II de Lampa": 10803,
+        "Centro de Salud Familiar Batuco": 16853
+      },
+      "sectors": {
+        "Amarillo": 16193,
+        "Verde": 6716,
+        "Sin Datos": 35475,
+        "Azul": 16597,
+        "Sala Neurodiversa": 65,
+        "Sector 1": 6707,
+        "Sector 2": 7276,
+        "Lila": 2,
+        "CECOSF": 5
+      },
+      "migrantes": 8934,
+      "discapacidad": 1283,
+      "cuidador": 264,
+      "prais": 1183,
+      "top_nations": {
+        "Chile": 64571,
+        "Sin Datos": 7940,
+        "Desconocido": 7591,
+        "Venezuela": 4581,
+        "Haiti": 1044,
+        "Ecuador": 446,
+        "Peru": 1070,
+        "Colombia": 868,
+        "Togo": 1,
+        "Bolivia": 618,
+        "Mexico": 5,
+        "Brasil": 16,
+        "Argentina": 95,
+        "Dominica": 27,
+        "Paraguay": 22,
+        "Republica Dominicana": 29,
+        "Brunei": 1,
+        "Cuba": 48,
+        "Chad": 11,
+        "Francia": 2,
+        "Uruguay": 3,
+        "Nicaragua": 6,
+        "Zimbabwe": 1,
+        "No informado": 2,
+        "Vanuatu": 3,
+        "Surinam": 2,
+        "Italia": 2,
+        "Republica Centroafricana": 1,
+        "Siria": 2,
+        "Espaa": 5,
+        "Tailandia": 1,
+        "Irᮼ/td>": 1,
+        "El Salvador": 3,
+        "Butᮼ/td>": 1,
+        "Austria": 1,
+        "Cabo Verde": 3,
+        "China": 4,
+        "Ucrania": 1,
+        "Honduras": 1,
+        "Filipinas": 1,
+        "Holanda": 1,
+        "Ashmore Y Cartier": 1,
+        "Vietnam": 1,
+        "Andorra": 1,
+        "Trinidad Y Tobago": 2
+      },
+      "etnias": {
+        "No tiene": 65296,
+        "Otro (Especificar)": 10175,
+        "Sin Datos": 11551,
+        "Mapuche": 1001,
+        "No responde": 159,
+        "Chango": 209,
+        "Colla": 101,
+        "Diaguita": 90,
+        "Rapa Nui": 44,
+        "Quechua": 129,
+        "Lickanantay": 82,
+        "Aymara": 40,
+        "No sabe": 18,
+        "Yagᮼ/td>": 104,
+        "Kaw鳱ar": 35,
+        "Alacalufe": 2
+      }
+    },
+    "2027": {
+      "total": 92263,
+      "mujeres": 48229,
+      "hombres": 44025,
+      "intersex": 9,
+      "tramos": {
+        "D": 19123,
+        "B": 25220,
+        "A": 31264,
+        "C": 12402,
+        "X": 4254
+      },
+      "pyramid": {
+        "Menos de 1 año": {
+          "M": 399,
+          "H": 423
+        },
+        "1 - 4 años": {
+          "M": 2173,
+          "H": 2201
+        },
+        "5 - 9 años": {
+          "M": 3686,
+          "H": 3764
+        },
+        "10 - 14 años": {
+          "M": 3761,
+          "H": 3873
+        },
+        "15 - 19 años": {
+          "M": 3700,
+          "H": 3773
+        },
+        "20 - 24 años": {
+          "M": 3532,
+          "H": 3136
+        },
+        "25 - 29 años": {
+          "M": 3810,
+          "H": 3258
+        },
+        "30 - 34 años": {
+          "M": 4289,
+          "H": 3492
+        },
+        "35 - 39 años": {
+          "M": 4257,
+          "H": 3557
+        },
+        "40 - 44 años": {
+          "M": 3550,
+          "H": 3018
+        },
+        "45 - 49 años": {
+          "M": 2989,
+          "H": 2575
+        },
+        "50 - 54 años": {
+          "M": 2767,
+          "H": 2436
+        },
+        "55 - 59 años": {
+          "M": 2417,
+          "H": 2228
+        },
+        "60 - 64 años": {
+          "M": 2170,
+          "H": 2095
+        },
+        "65 - 69 años": {
+          "M": 1759,
+          "H": 1657
+        },
+        "70 - 74 años": {
+          "M": 1184,
+          "H": 1118
+        },
+        "75 - 79 años": {
+          "M": 803,
+          "H": 710
+        },
+        "80 y mas años": {
+          "M": 983,
+          "H": 711
+        }
+      },
+      "centers": {
+        "Posta de Salud Rural Juan Pablo II de Lampa": 11314,
+        "Centro de Salud Familiar  José Bauza Frau": 48948,
+        "Centro Comunitario de Salud Familiar Batuco": 7307,
+        "Centro de Salud Familiar Batuco": 17130,
+        "Centro Comunitario de Salud Familiar Sol de Septiembre": 7564
+      },
+      "sectors": {
+        "Sin Datos": 34615,
+        "Amarillo": 17574,
+        "Verde": 7159,
+        "Sector 2": 7666,
+        "Azul": 17932,
+        "Sala Neurodiversa": 68,
+        "Lila": 4,
+        "Sector 1": 7239,
+        "Rojo": 1,
+        "CECOSF": 5
+      },
+      "migrantes": 10953,
+      "discapacidad": 1328,
+      "cuidador": 273,
+      "prais": 1254,
+      "top_nations": {
+        "Chile": 68514,
+        "Desconocido": 7855,
+        "Venezuela": 5500,
+        "Sin Datos": 4941,
+        "Peru": 1319,
+        "Ecuador": 597,
+        "Colombia": 1081,
+        "Haiti": 1244,
+        "Cabo Verde": 4,
+        "Paraguay": 24,
+        "Argentina": 111,
+        "Cuba": 66,
+        "Republica Dominicana": 40,
+        "Bolivia": 837,
+        "Nicaragua": 6,
+        "No informado": 3,
+        "Espaa": 7,
+        "Dominica": 31,
+        "China": 9,
+        "Mexico": 5,
+        "Ucrania": 1,
+        "Chad": 13,
+        "Italia": 2,
+        "Honduras": 1,
+        "Surinam": 2,
+        "Irᮼ/td>": 1,
+        "Brasil": 17,
+        "Uruguay": 3,
+        "Estados Unidos De Amrica": 3,
+        "Republica Centroafricana": 2,
+        "Vanuatu": 3,
+        "Togo": 1,
+        "Francia": 2,
+        "Siria": 1,
+        "El Salvador": 3,
+        "Tailandia": 1,
+        "Brunei": 1,
+        "Butᮼ/td>": 1,
+        "Zimbabwe": 1,
+        "Austria": 1,
+        "India": 1,
+        "Vietnam": 1,
+        "Trinidad Y Tobago": 2,
+        "Andorra": 1,
+        "Holanda": 1,
+        "Angola": 1,
+        "Ashmore Y Cartier": 1,
+        "Filipinas": 1
+      },
+      "etnias": {
+        "No tiene": 70634,
+        "Otro (Especificar)": 10868,
+        "Sin Datos": 8542,
+        "Chango": 217,
+        "Quechua": 160,
+        "Lickanantay": 85,
+        "Mapuche": 1115,
+        "Kaw鳱ar": 39,
+        "Colla": 105,
+        "Rapa Nui": 51,
+        "No responde": 159,
+        "Yagᮼ/td>": 109,
+        "Diaguita": 98,
+        "Aymara": 46,
+        "Alacalufe": 2,
+        "No sabe": 33
+      }
+    }
+  }
+}
