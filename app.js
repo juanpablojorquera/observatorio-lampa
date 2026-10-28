@@ -25,7 +25,7 @@ const state = {
     sector: 'ALL',
     gender: 'ALL',
     tramo: 'ALL',
-    ageGroup: 'ALL',
+    ageGroups: [],      // Empty array = Todas las edades ('ALL')
     nationality: 'ALL',
     disability: false,
     caregiver: false,
@@ -259,10 +259,8 @@ function setupEventListeners() {
     onFilterChange();
   });
 
-  document.getElementById('filter-age-group').addEventListener('change', (e) => {
-    state.filters.ageGroup = e.target.value;
-    onFilterChange();
-  });
+  // Multi-select Age Filter Setup
+  setupAgeMultiSelect();
 
   document.getElementById('filter-nationality').addEventListener('change', (e) => {
     state.filters.nationality = e.target.value;
@@ -472,7 +470,7 @@ function resetFilters() {
   state.filters.sector = 'ALL';
   state.filters.gender = 'ALL';
   state.filters.tramo = 'ALL';
-  state.filters.ageGroup = 'ALL';
+  state.filters.ageGroups = [];
   state.filters.nationality = 'ALL';
   state.filters.disability = false;
   state.filters.caregiver = false;
@@ -485,7 +483,8 @@ function resetFilters() {
   document.getElementById('filter-sector').value = 'ALL';
   document.getElementById('filter-gender').value = 'ALL';
   document.getElementById('filter-tramo').value = 'ALL';
-  document.getElementById('filter-age-group').value = 'ALL';
+  document.querySelectorAll('.age-checkbox').forEach(cb => { cb.checked = false; });
+  updateAgeMultiSelectUI();
   document.getElementById('filter-nationality').value = 'ALL';
   document.getElementById('check-disability').checked = false;
   document.getElementById('check-caregiver').checked = false;
@@ -504,6 +503,118 @@ function resetFilters() {
 function onFilterChange() {
   state.pagination.page = 1;
   applyFilters();
+}
+
+// Multi-Select Age Group Controller
+function setupAgeMultiSelect() {
+  const container = document.getElementById('age-multiselect-container');
+  const btnToggle = document.getElementById('btn-age-multiselect');
+  const dropdown = document.getElementById('age-multiselect-dropdown');
+  const chevron = document.getElementById('age-multiselect-chevron');
+  const checkboxes = document.querySelectorAll('.age-checkbox');
+  const btnSelectAll = document.getElementById('btn-age-select-all');
+  const btnClear = document.getElementById('btn-age-clear');
+  const presetBtns = document.querySelectorAll('.age-preset-btn');
+
+  if (!container || !btnToggle || !dropdown) return;
+
+  const closeDropdown = () => {
+    dropdown.classList.add('hidden');
+    if (chevron) chevron.classList.remove('rotate-180');
+  };
+
+  btnToggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isHidden = dropdown.classList.toggle('hidden');
+    if (chevron) chevron.classList.toggle('rotate-180', !isHidden);
+  });
+
+  // Close when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!container.contains(e.target)) {
+      closeDropdown();
+    }
+  });
+
+  // Sync state from checkboxes
+  const syncAgeSelectionFromDOM = () => {
+    const selected = [];
+    checkboxes.forEach(cb => {
+      if (cb.checked) selected.push(cb.value);
+    });
+    state.filters.ageGroups = selected;
+    updateAgeMultiSelectUI();
+    onFilterChange();
+  };
+
+  checkboxes.forEach(cb => {
+    cb.addEventListener('change', syncAgeSelectionFromDOM);
+  });
+
+  if (btnSelectAll) {
+    btnSelectAll.addEventListener('click', () => {
+      checkboxes.forEach(cb => {
+        if (cb.value !== '60plus') cb.checked = true;
+        else cb.checked = false;
+      });
+      syncAgeSelectionFromDOM();
+    });
+  }
+
+  if (btnClear) {
+    btnClear.addEventListener('click', () => {
+      checkboxes.forEach(cb => { cb.checked = false; });
+      syncAgeSelectionFromDOM();
+    });
+  }
+
+  // Preset Macro-Groups
+  const presets = {
+    'infancia': ['Menos de 1 año', '1 - 4 años', '5 - 9 años'],
+    'adolescencia': ['10 - 14 años', '15 - 19 años'],
+    'adultos': ['20 - 24 años', '25 - 29 años', '30 - 34 años', '35 - 39 años', '40 - 44 años', '45 - 49 años', '50 - 54 años', '55 - 59 años'],
+    '60plus': ['60 - 64 años', '65 - 69 años', '70 - 74 años', '75 - 79 años', '80 y mas años'],
+    '65plus': ['65 - 69 años', '70 - 74 años', '75 - 79 años', '80 y mas años']
+  };
+
+  presetBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const presetKey = btn.getAttribute('data-age-preset');
+      const targetValues = presets[presetKey] || [];
+      // Check if all targetValues are already checked (toggle behavior)
+      const allAlreadyChecked = targetValues.every(val => {
+        const cb = Array.from(checkboxes).find(c => c.value === val);
+        return cb && cb.checked;
+      });
+
+      checkboxes.forEach(cb => {
+        if (cb.value === '60plus') {
+          cb.checked = false;
+        } else if (targetValues.includes(cb.value)) {
+          cb.checked = !allAlreadyChecked;
+        }
+      });
+      syncAgeSelectionFromDOM();
+    });
+  });
+}
+
+function updateAgeMultiSelectUI() {
+  const label = document.getElementById('age-multiselect-label');
+  const btn = document.getElementById('btn-age-multiselect');
+  if (!label || !btn) return;
+
+  const selected = state.filters.ageGroups || [];
+  if (selected.length === 0) {
+    label.textContent = 'Todas las edades';
+    btn.classList.remove('border-blue-500', 'bg-blue-50', 'dark:bg-blue-950/50', 'text-blue-700', 'dark:text-blue-300');
+  } else if (selected.length === 1) {
+    label.textContent = selected[0] === '60plus' ? '60 y más años' : selected[0];
+    btn.classList.add('border-blue-500', 'bg-blue-50', 'dark:bg-blue-950/50', 'text-blue-700', 'dark:text-blue-300');
+  } else {
+    label.textContent = `${selected.length} rangos seleccionados`;
+    btn.classList.add('border-blue-500', 'bg-blue-50', 'dark:bg-blue-950/50', 'text-blue-700', 'dark:text-blue-300');
+  }
 }
 
 // Sector Dropdown updater
@@ -968,7 +1079,7 @@ function applyFilters() {
   if (f.sector !== 'ALL') activeFiltersCount++;
   if (f.gender !== 'ALL') activeFiltersCount++;
   if (f.tramo !== 'ALL') activeFiltersCount++;
-  if (f.ageGroup !== 'ALL') activeFiltersCount++;
+  if (f.ageGroups && f.ageGroups.length > 0) activeFiltersCount++;
   if (f.nationality !== 'ALL') activeFiltersCount++;
   if (f.disability) activeFiltersCount++;
   if (f.caregiver) activeFiltersCount++;
@@ -991,7 +1102,9 @@ function applyFilters() {
   const checkSector = f.sector !== 'ALL';
   const checkGender = f.gender !== 'ALL';
   const checkTramo = f.tramo !== 'ALL';
-  const checkAge = f.ageGroup !== 'ALL';
+  const checkAge = f.ageGroups && f.ageGroups.length > 0;
+  const has60Plus = checkAge && f.ageGroups.includes('60plus');
+  const ageGroupSet = checkAge ? new Set(f.ageGroups) : null;
   const checkNat = f.nationality !== 'ALL';
   const searchStr = f.search;
 
@@ -1072,12 +1185,10 @@ function applyFilters() {
     if (checkTramo && item.t !== f.tramo) continue;
 
     if (checkAge) {
-      if (f.ageGroup === '60plus') {
-        if (item.e < 60) continue;
-      } else {
-        const brk = getAgeBracket(item.e);
-        if (brk !== f.ageGroup) continue;
-      }
+      const brk = getAgeBracket(item.e);
+      const match60 = has60Plus && item.e >= 60;
+      const matchBrk = ageGroupSet.has(brk);
+      if (!match60 && !matchBrk) continue;
     }
 
     if (checkNat) {

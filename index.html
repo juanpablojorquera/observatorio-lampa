@@ -269,30 +269,65 @@
           
           <!-- Age & Nationality dropdowns -->
           <div class="flex flex-wrap items-center gap-3">
-            <div class="flex items-center space-x-1.5">
+            <div class="flex items-center space-x-1.5 relative" id="age-multiselect-container">
               <span class="text-slate-500 font-medium">Edad:</span>
-              <select id="filter-age-group" class="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md px-2 py-1 font-medium text-slate-800 dark:text-slate-200">
-                <option value="ALL">Todas las edades</option>
-                <option value="Menos de 1 año">Menos de 1 año</option>
-                <option value="1 - 4 años">1 - 4 años</option>
-                <option value="5 - 9 años">5 - 9 años</option>
-                <option value="10 - 14 años">10 - 14 años</option>
-                <option value="15 - 19 años">15 - 19 años</option>
-                <option value="20 - 24 años">20 - 24 años</option>
-                <option value="25 - 29 años">25 - 29 años</option>
-                <option value="30 - 34 años">30 - 34 años</option>
-                <option value="35 - 39 años">35 - 39 años</option>
-                <option value="40 - 44 años">40 - 44 años</option>
-                <option value="45 - 49 años">45 - 49 años</option>
-                <option value="50 - 54 años">50 - 54 años</option>
-                <option value="55 - 59 años">55 - 59 años</option>
-                <option value="60 - 64 años">60 - 64 años</option>
-                <option value="65 - 69 años">65 - 69 años</option>
-                <option value="70 - 74 años">70 - 74 años</option>
-                <option value="75 - 79 años">75 - 79 años</option>
-                <option value="80 y mas años">80 y mas años</option>
-                <option value="60plus">60 y más años (Adultos Mayores)</option>
-              </select>
+              <button type="button" id="btn-age-multiselect" class="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 rounded-md px-2.5 py-1 font-medium text-slate-800 dark:text-slate-200 flex items-center justify-between space-x-2 min-w-[170px] transition focus:ring-2 focus:ring-blue-500">
+                <span id="age-multiselect-label" class="truncate max-w-[200px]">Todas las edades</span>
+                <svg id="age-multiselect-chevron" class="w-3.5 h-3.5 text-slate-400 transition-transform duration-200 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+              </button>
+
+              <!-- Dropdown Panel Multi-Select -->
+              <div id="age-multiselect-dropdown" class="hidden absolute left-0 top-full mt-1.5 w-72 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                <!-- Header Actions -->
+                <div class="p-2.5 bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 flex flex-col gap-2">
+                  <div class="flex items-center justify-between">
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Seleccionar Rangos</span>
+                    <div class="flex items-center space-x-2">
+                      <button type="button" id="btn-age-select-all" class="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline">Todas</button>
+                      <span class="text-slate-300 dark:text-slate-600">|</span>
+                      <button type="button" id="btn-age-clear" class="text-[11px] font-semibold text-rose-600 dark:text-rose-400 hover:underline">Limpiar</button>
+                    </div>
+                  </div>
+                  <!-- Quick Macro-Group Presets -->
+                  <div class="flex flex-wrap gap-1 pt-0.5">
+                    <button type="button" data-age-preset="infancia" class="age-preset-btn px-2 py-0.5 rounded text-[10px] font-semibold bg-sky-100 text-sky-700 hover:bg-sky-200 dark:bg-sky-950/70 dark:text-sky-300 dark:hover:bg-sky-900 transition">👶 Infancia (0-9)</button>
+                    <button type="button" data-age-preset="adolescencia" class="age-preset-btn px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-100 text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-950/70 dark:text-indigo-300 dark:hover:bg-indigo-900 transition">🧑 Adolesc. (10-19)</button>
+                    <button type="button" data-age-preset="adultos" class="age-preset-btn px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-950/70 dark:text-emerald-300 dark:hover:bg-emerald-900 transition">💼 Adultos (20-59)</button>
+                    <button type="button" data-age-preset="60plus" class="age-preset-btn px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-950/70 dark:text-amber-300 dark:hover:bg-amber-900 transition">🧓 60+ Años</button>
+                    <button type="button" data-age-preset="65plus" class="age-preset-btn px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-100 text-purple-800 hover:bg-purple-200 dark:bg-purple-950/70 dark:text-purple-300 dark:hover:bg-purple-900 transition">🦯 65+ Años</button>
+                  </div>
+                </div>
+
+                <!-- Checkboxes List -->
+                <div id="age-multiselect-options" class="max-h-60 overflow-y-auto p-1.5 divide-y divide-slate-100 dark:divide-slate-800/60">
+                  <label class="flex items-center space-x-2.5 px-2.5 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/70 cursor-pointer transition">
+                    <input type="checkbox" value="60plus" class="age-checkbox rounded text-amber-600 focus:ring-amber-500">
+                    <span class="font-semibold text-amber-700 dark:text-amber-400">⭐ 60 y más años (Adultos Mayores)</span>
+                  </label>
+                  <div class="py-1 space-y-0.5">
+                    <label class="flex items-center space-x-2.5 px-2.5 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800/70 cursor-pointer transition"><input type="checkbox" value="Menos de 1 año" class="age-checkbox rounded text-blue-600 focus:ring-blue-500"><span>Menos de 1 año</span></label>
+                    <label class="flex items-center space-x-2.5 px-2.5 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800/70 cursor-pointer transition"><input type="checkbox" value="1 - 4 años" class="age-checkbox rounded text-blue-600 focus:ring-blue-500"><span>1 - 4 años</span></label>
+                    <label class="flex items-center space-x-2.5 px-2.5 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800/70 cursor-pointer transition"><input type="checkbox" value="5 - 9 años" class="age-checkbox rounded text-blue-600 focus:ring-blue-500"><span>5 - 9 años</span></label>
+                    <label class="flex items-center space-x-2.5 px-2.5 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800/70 cursor-pointer transition"><input type="checkbox" value="10 - 14 años" class="age-checkbox rounded text-blue-600 focus:ring-blue-500"><span>10 - 14 años</span></label>
+                    <label class="flex items-center space-x-2.5 px-2.5 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800/70 cursor-pointer transition"><input type="checkbox" value="15 - 19 años" class="age-checkbox rounded text-blue-600 focus:ring-blue-500"><span>15 - 19 años</span></label>
+                    <label class="flex items-center space-x-2.5 px-2.5 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800/70 cursor-pointer transition"><input type="checkbox" value="20 - 24 años" class="age-checkbox rounded text-blue-600 focus:ring-blue-500"><span>20 - 24 años</span></label>
+                    <label class="flex items-center space-x-2.5 px-2.5 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800/70 cursor-pointer transition"><input type="checkbox" value="25 - 29 años" class="age-checkbox rounded text-blue-600 focus:ring-blue-500"><span>25 - 29 años</span></label>
+                    <label class="flex items-center space-x-2.5 px-2.5 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800/70 cursor-pointer transition"><input type="checkbox" value="30 - 34 años" class="age-checkbox rounded text-blue-600 focus:ring-blue-500"><span>30 - 34 años</span></label>
+                    <label class="flex items-center space-x-2.5 px-2.5 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800/70 cursor-pointer transition"><input type="checkbox" value="35 - 39 años" class="age-checkbox rounded text-blue-600 focus:ring-blue-500"><span>35 - 39 años</span></label>
+                    <label class="flex items-center space-x-2.5 px-2.5 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800/70 cursor-pointer transition"><input type="checkbox" value="40 - 44 años" class="age-checkbox rounded text-blue-600 focus:ring-blue-500"><span>40 - 44 años</span></label>
+                    <label class="flex items-center space-x-2.5 px-2.5 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800/70 cursor-pointer transition"><input type="checkbox" value="45 - 49 años" class="age-checkbox rounded text-blue-600 focus:ring-blue-500"><span>45 - 49 años</span></label>
+                    <label class="flex items-center space-x-2.5 px-2.5 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800/70 cursor-pointer transition"><input type="checkbox" value="50 - 54 años" class="age-checkbox rounded text-blue-600 focus:ring-blue-500"><span>50 - 54 años</span></label>
+                    <label class="flex items-center space-x-2.5 px-2.5 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800/70 cursor-pointer transition"><input type="checkbox" value="55 - 59 años" class="age-checkbox rounded text-blue-600 focus:ring-blue-500"><span>55 - 59 años</span></label>
+                    <label class="flex items-center space-x-2.5 px-2.5 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800/70 cursor-pointer transition"><input type="checkbox" value="60 - 64 años" class="age-checkbox rounded text-blue-600 focus:ring-blue-500"><span>60 - 64 años</span></label>
+                    <label class="flex items-center space-x-2.5 px-2.5 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800/70 cursor-pointer transition"><input type="checkbox" value="65 - 69 años" class="age-checkbox rounded text-blue-600 focus:ring-blue-500"><span>65 - 69 años</span></label>
+                    <label class="flex items-center space-x-2.5 px-2.5 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800/70 cursor-pointer transition"><input type="checkbox" value="70 - 74 años" class="age-checkbox rounded text-blue-600 focus:ring-blue-500"><span>70 - 74 años</span></label>
+                    <label class="flex items-center space-x-2.5 px-2.5 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800/70 cursor-pointer transition"><input type="checkbox" value="75 - 79 años" class="age-checkbox rounded text-blue-600 focus:ring-blue-500"><span>75 - 79 años</span></label>
+                    <label class="flex items-center space-x-2.5 px-2.5 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800/70 cursor-pointer transition"><input type="checkbox" value="80 y mas años" class="age-checkbox rounded text-blue-600 focus:ring-blue-500"><span>80 y mas años</span></label>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div class="flex items-center space-x-1.5">
