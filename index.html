@@ -637,10 +637,10 @@
           <div class="lg:col-span-2 bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200/80 dark:border-slate-800">
             <div class="flex items-center justify-between mb-4">
               <div>
-                <h3 class="text-base font-bold text-slate-900 dark:text-white">
+                <h3 id="title-centros-comparativa" class="text-base font-bold text-slate-900 dark:text-white">
                   Población Validada por Centro de Salud (2026 vs 2027)
                 </h3>
-                <p class="text-xs text-slate-500 dark:text-slate-400">
+                <p id="subtitle-centros-comparativa" class="text-xs text-slate-500 dark:text-slate-400">
                   Comparativa de inscritos per cápita validados entre ambos períodos
                 </p>
               </div>
@@ -686,7 +686,7 @@
         <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200/80 dark:border-slate-800">
           <div class="flex items-center justify-between mb-4">
             <div>
-              <h3 class="text-base font-bold text-slate-900 dark:text-white">
+              <h3 id="title-table-centros" class="text-base font-bold text-slate-900 dark:text-white">
                 Detalle Comparativo por Establecimiento de Salud
               </h3>
               <p class="text-xs text-slate-500 dark:text-slate-400">
@@ -698,7 +698,7 @@
             <table class="w-full text-xs text-left">
               <thead class="bg-slate-50 dark:bg-slate-800/60 uppercase font-bold text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
                 <tr>
-                  <th class="px-4 py-3">Establecimiento</th>
+                  <th id="th-comparativa-col1" class="px-4 py-3">Establecimiento</th>
                   <th class="px-4 py-3 text-right">Validados 2026</th>
                   <th class="px-4 py-3 text-right">Validados 2027</th>
                   <th class="px-4 py-3 text-right">Variación Absoluta</th>
@@ -831,10 +831,10 @@
           <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200/80 dark:border-slate-800">
             <div class="flex items-center justify-between mb-4">
               <div>
-                <h3 class="text-base font-bold text-slate-900 dark:text-white">
+                <h3 id="title-comparativa-centros-delta" class="text-base font-bold text-slate-900 dark:text-white">
                   Variación Neta por Centro de Salud (2026 vs 2027)
                 </h3>
-                <p class="text-xs text-slate-500 dark:text-slate-400">
+                <p id="subtitle-comparativa-centros-delta" class="text-xs text-slate-500 dark:text-slate-400">
                   Nuevos inscritos validados incorporados a cada centro de la red comunal
                 </p>
               </div>
@@ -928,7 +928,7 @@
             <div class="flex items-center space-x-2 text-xs">
               <span class="text-slate-500 font-medium">Dimensión:</span>
               <select id="select-comparativa-dimension" class="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 font-bold text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500">
-                <option value="centros" selected>Centros de Salud</option>
+                <option id="opt-dim-centros" value="centros" selected>Centros de Salud</option>
                 <option value="tramos">Tramos FONASA</option>
                 <option value="edades">Grupos Etarios (18 Grupos)</option>
                 <option value="naciones">Top Nacionalidades</option>
@@ -1096,7 +1096,7 @@
           <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200/80 dark:border-slate-800">
             <div class="flex items-start justify-between mb-4">
               <div>
-                <h3 class="text-base font-bold text-slate-900 dark:text-white mb-1">
+                <h3 id="title-tramos-stacked" class="text-base font-bold text-slate-900 dark:text-white mb-1">
                   Estructura de Tramos FONASA por Centro de Salud (100% Apilado)
                 </h3>
                 <p class="text-xs text-slate-500 dark:text-slate-400">
@@ -1188,7 +1188,7 @@
         <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200/80 dark:border-slate-800">
           <div class="flex items-center justify-between mb-4">
             <div>
-              <h3 class="text-base font-bold text-slate-900 dark:text-white">
+              <h3 id="title-table-tramos" class="text-base font-bold text-slate-900 dark:text-white">
                 Distribución Detallada de Tramos FONASA por Establecimiento
               </h3>
               <p class="text-xs text-slate-500 dark:text-slate-400">
@@ -1200,7 +1200,7 @@
             <table class="w-full text-xs text-left">
               <thead class="bg-slate-50 dark:bg-slate-800/60 uppercase font-bold text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
                 <tr>
-                  <th class="px-3.5 py-2.5">Establecimiento</th>
+                  <th id="th-tramos-col1" class="px-3.5 py-2.5">Establecimiento</th>
                   <th class="px-3.5 py-2.5 text-right">Total Validados</th>
                   <th class="px-3.5 py-2.5 text-right text-emerald-600 dark:text-emerald-400">Tramo A</th>
                   <th class="px-3.5 py-2.5 text-right text-teal-600 dark:text-teal-400">Tramo B</th>
@@ -1329,7 +1329,7 @@
         <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200/80 dark:border-slate-800">
           <div class="flex items-start justify-between mb-4">
             <div>
-              <h3 class="text-base font-bold text-slate-900 dark:text-white mb-1">
+              <h3 id="title-programas-centros" class="text-base font-bold text-slate-900 dark:text-white mb-1">
                 Distribución Territorial de Programas Prioritarios por Centro
               </h3>
               <p class="text-xs text-slate-500 dark:text-slate-400">
@@ -1349,7 +1349,7 @@
         <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200/80 dark:border-slate-800">
           <div class="flex items-center justify-between mb-4">
             <div>
-              <h3 class="text-base font-bold text-slate-900 dark:text-white">
+              <h3 id="title-table-inclusion" class="text-base font-bold text-slate-900 dark:text-white">
                 Distribución Territorial de Migración, Etnias y Programas por Establecimiento
               </h3>
               <p class="text-xs text-slate-500 dark:text-slate-400">
@@ -1361,7 +1361,7 @@
             <table class="w-full text-xs text-left">
               <thead class="bg-slate-50 dark:bg-slate-800/60 uppercase font-bold text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
                 <tr>
-                  <th class="px-3.5 py-2.5">Establecimiento</th>
+                  <th id="th-inclusion-col1" class="px-3.5 py-2.5">Establecimiento</th>
                   <th class="px-3.5 py-2.5 text-right">Total Inscritos</th>
                   <th class="px-3.5 py-2.5 text-right text-indigo-600 dark:text-indigo-400">Migrantes</th>
                   <th class="px-3.5 py-2.5 text-right font-bold">% Migrante</th>
@@ -1501,7 +1501,7 @@
                 <div id="sim-presupuesto-2026" class="text-2xl sm:text-3xl font-extrabold font-mono text-slate-800 dark:text-slate-200 mt-1">
                   $13.620.000.000
                 </div>
-                <span class="text-xs text-slate-400 font-mono">Basado en 89.036 validados</span>
+                <span id="sim-subtext-2026" class="text-xs text-slate-400 font-mono">Basado en 89.036 validados</span>
               </div>
 
               <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm">
@@ -1509,7 +1509,7 @@
                 <div id="sim-presupuesto-2027" class="text-2xl sm:text-3xl font-extrabold font-mono text-blue-600 dark:text-blue-400 mt-1">
                   $14.113.000.000
                 </div>
-                <span class="text-xs text-slate-400 font-mono">Basado en 92.263 validados</span>
+                <span id="sim-subtext-2027" class="text-xs text-slate-400 font-mono">Basado en 92.263 validados</span>
               </div>
             </div>
 
@@ -1517,11 +1517,11 @@
             <div class="bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-2xl p-5 shadow-sm">
               <div class="flex flex-wrap items-center justify-between gap-4">
                 <div>
-                  <span class="text-xs uppercase font-bold text-emerald-200 tracking-wider">Incremento Presupuestario Neto para Lampa</span>
+                  <span id="sim-banner-title" class="text-xs uppercase font-bold text-emerald-200 tracking-wider">Incremento Presupuestario Neto para Lampa</span>
                   <div id="sim-incremento-neto" class="text-3xl sm:text-4xl font-extrabold font-mono mt-1">
                     +$493.630.000 CLP / año
                   </div>
-                  <p class="text-xs text-emerald-100 mt-1">
+                  <p id="sim-banner-desc" class="text-xs text-emerald-100 mt-1">
                     Fondos adicionales generados por los <strong>+3.227 nuevos inscritos validados</strong> en el proceso 2027.
                   </p>
                 </div>

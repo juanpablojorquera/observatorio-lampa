@@ -109,6 +109,14 @@ function getCicloVital(age) {
   return 'Persona Mayor (65+)';
 }
 
+function getShortCenterName(fullName) {
+  if (!fullName || fullName === 'ALL') return 'Comuna de Lampa';
+  return fullName.replace('Centro de Salud Familiar  ', 'CESFAM ')
+                 .replace('Centro de Salud Familiar ', 'CESFAM ')
+                 .replace('Centro Comunitario de Salud Familiar ', 'CECOSF ')
+                 .replace('Posta de Salud Rural ', 'PSR ');
+}
+
 // Number formatting (Chilean locale: 1.234)
 function formatNum(num) {
   if (num === null || num === undefined || isNaN(num)) return '0';
@@ -880,11 +888,34 @@ function loadPrecomputedSummaryFallback() {
 
 // Precompute and cache cohort counts and center vulnerability stats in a single fast loop
 function precalculateCache(raw) {
-  const cohortCounts = {
-    '2026': { 'adulto-pobreza': 0, 'infancia-riesgo': 0, 'salud-mujer': 0, 'brecha-cuidadores': 0, 'ninos-migrantes': 0, 'tramo-x': 0 },
-    '2027': { 'adulto-pobreza': 0, 'infancia-riesgo': 0, 'salud-mujer': 0, 'brecha-cuidadores': 0, 'ninos-migrantes': 0, 'tramo-x': 0 },
-    'ALL': { 'adulto-pobreza': 0, 'infancia-riesgo': 0, 'salud-mujer': 0, 'brecha-cuidadores': 0, 'ninos-migrantes': 0, 'tramo-x': 0 }
+  const centersList = [
+    'Centro de Salud Familiar  José Bauza Frau',
+    'Centro de Salud Familiar Batuco',
+    'Posta de Salud Rural Juan Pablo II de Lampa',
+    'Centro Comunitario de Salud Familiar Sol de Septiembre',
+    'Centro Comunitario de Salud Familiar Batuco'
+  ];
+
+  const blankCohort = () => ({
+    'adulto-pobreza': 0,
+    'infancia-riesgo': 0,
+    'salud-mujer': 0,
+    'brecha-cuidadores': 0,
+    'ninos-migrantes': 0,
+    'tramo-x': 0
+  });
+
+  const cohortCountsByCenter = {
+    'ALL': { '2026': blankCohort(), '2027': blankCohort(), 'ALL': blankCohort() }
   };
+
+  centersList.forEach(c => {
+    cohortCountsByCenter[c] = {
+      '2026': blankCohort(),
+      '2027': blankCohort(),
+      'ALL': blankCohort()
+    };
+  });
 
   const centerStats = {
     '2026': {
@@ -907,6 +938,7 @@ function precalculateCache(raw) {
   for (let i = 0; i < len; i++) {
     const it = raw[i];
     const yr = it.y;
+    const c = it.c;
     const is65A = it.e >= 65 && it.t === 'A';
     const isInfA = it.e <= 4 && it.t === 'A';
     const isMujerFertil = it.g === 'MUJER' && it.e >= 15 && it.e <= 49;
@@ -914,37 +946,38 @@ function precalculateCache(raw) {
     const isNinoMig = it.e < 10 && it.n !== 'Chile' && it.n !== 'Desconocido' && it.n !== 'Sin Datos' && it.n !== '';
     const isTramoX = it.t === 'X';
 
-    // Accumulate for specific year
-    if (cohortCounts[yr]) {
-      if (is65A) cohortCounts[yr]['adulto-pobreza']++;
-      if (isInfA) cohortCounts[yr]['infancia-riesgo']++;
-      if (isMujerFertil) cohortCounts[yr]['salud-mujer']++;
-      if (isBrechaCuid) cohortCounts[yr]['brecha-cuidadores']++;
-      if (isNinoMig) cohortCounts[yr]['ninos-migrantes']++;
-      if (isTramoX) cohortCounts[yr]['tramo-x']++;
+    const countTarget = (bucket) => {
+      if (!bucket) return;
+      if (is65A) bucket['adulto-pobreza']++;
+      if (isInfA) bucket['infancia-riesgo']++;
+      if (isMujerFertil) bucket['salud-mujer']++;
+      if (isBrechaCuid) bucket['brecha-cuidadores']++;
+      if (isNinoMig) bucket['ninos-migrantes']++;
+      if (isTramoX) bucket['tramo-x']++;
+    };
+
+    if (cohortCountsByCenter['ALL'][yr]) countTarget(cohortCountsByCenter['ALL'][yr]);
+    countTarget(cohortCountsByCenter['ALL']['ALL']);
+
+    if (cohortCountsByCenter[c]) {
+      if (cohortCountsByCenter[c][yr]) countTarget(cohortCountsByCenter[c][yr]);
+      countTarget(cohortCountsByCenter[c]['ALL']);
     }
 
-    // Accumulate for ALL
-    if (is65A) cohortCounts['ALL']['adulto-pobreza']++;
-    if (isInfA) cohortCounts['ALL']['infancia-riesgo']++;
-    if (isMujerFertil) cohortCounts['ALL']['salud-mujer']++;
-    if (isBrechaCuid) cohortCounts['ALL']['brecha-cuidadores']++;
-    if (isNinoMig) cohortCounts['ALL']['ninos-migrantes']++;
-    if (isTramoX) cohortCounts['ALL']['tramo-x']++;
-
     // Vulnerability tracking by center
-    if (centerStats[yr] && centerStats[yr][it.c]) {
-      const c = centerStats[yr][it.c];
-      c.total++;
-      if (it.t === 'A') c.tramoA++;
-      if (it.e >= 60) c.adultos60++;
-      if (it.e < 10) c.infancia++;
-      if (it.n !== 'Chile' && it.n !== 'Desconocido' && it.n !== 'Sin Datos' && it.n !== '') c.migrantes++;
-      if (it.d) c.discapacidad++;
+    if (centerStats[yr] && centerStats[yr][c]) {
+      const cs = centerStats[yr][c];
+      cs.total++;
+      if (it.t === 'A') cs.tramoA++;
+      if (it.e >= 60) cs.adultos60++;
+      if (it.e < 10) cs.infancia++;
+      if (it.n !== 'Chile' && it.n !== 'Desconocido' && it.n !== 'Sin Datos' && it.n !== '') cs.migrantes++;
+      if (it.d) cs.discapacidad++;
     }
   }
 
-  state.cachedCohortCounts = cohortCounts;
+  state.cachedCohortCountsByCenter = cohortCountsByCenter;
+  state.cachedCohortCounts = cohortCountsByCenter['ALL'];
   state.cachedVulnerabilityStats = centerStats;
 }
 
@@ -1171,7 +1204,16 @@ function applyFilters() {
     etnias: {},
 
     // Programas por Centro
-    programasCentros: {}
+    programasCentros: {},
+
+    // Sectores x Año (comparativa 2026 vs 2027 por sector)
+    sectorsYear: {},
+
+    // Tramos por Sector
+    tramosSectores: {},
+
+    // Programas por Sector
+    programasSectores: {}
   };
 
   // Single fast iteration over all raw rows
@@ -1234,6 +1276,13 @@ function applyFilters() {
     }
     if (agg.tramosEvolucion[item.y] && agg.tramosEvolucion[item.y][item.t] !== undefined) {
       agg.tramosEvolucion[item.y][item.t]++;
+    }
+    if (item.y === '2026' || item.y === '2027') {
+      const sName = item.s || 'Sin Datos';
+      if (!agg.sectorsYear[sName]) {
+        agg.sectorsYear[sName] = { '2026': 0, '2027': 0 };
+      }
+      agg.sectorsYear[sName][item.y]++;
     }
 
     // 2. Year filter check (determines cohort for active dashboard tab/metrics)
@@ -1312,6 +1361,29 @@ function applyFilters() {
     if (item.p) agg.programasCentros[item.c].prais++;
     if (item.d) agg.programasCentros[item.c].discapacidad++;
     if (item.cd) agg.programasCentros[item.c].cuidadores++;
+
+    // Tramos by Sector
+    const sName = item.s || 'Sin Datos';
+    if (!agg.tramosSectores[sName]) {
+      agg.tramosSectores[sName] = { A: 0, B: 0, C: 0, D: 0, X: 0, total: 0 };
+    }
+    if (agg.tramosSectores[sName][item.t] !== undefined) {
+      agg.tramosSectores[sName][item.t]++;
+      agg.tramosSectores[sName].total++;
+    }
+
+    // Programas by Sector
+    if (!agg.programasSectores[sName]) {
+      agg.programasSectores[sName] = { prais: 0, discapacidad: 0, cuidadores: 0, migrantes: 0, etnias: 0, total: 0 };
+    }
+    agg.programasSectores[sName].total++;
+    if (item.p) agg.programasSectores[sName].prais++;
+    if (item.d) agg.programasSectores[sName].discapacidad++;
+    if (item.cd) agg.programasSectores[sName].cuidadores++;
+    if (isMigrant) agg.programasSectores[sName].migrantes++;
+    if (item.et && item.et !== 'No tiene' && item.et !== 'Sin Datos' && item.et !== 'No responde' && item.et !== 'Otro (Especificar)') {
+      agg.programasSectores[sName].etnias++;
+    }
   }
 
   state.filteredData = filtered;
@@ -1320,6 +1392,9 @@ function applyFilters() {
   // Update UI Elements
   updateKPIs(agg);
   updateFilterCount(filtered.length, totalRaw);
+  updateCohortButtonCounts();
+  renderComparativaModule();
+  updateSimuladorCalculations();
   updateAllCharts(agg);
   renderComparativeTable(agg);
   renderVulnerabilityIndexSection();
@@ -1339,13 +1414,28 @@ function updateKPIs(agg) {
   const tot = agg.total;
   document.getElementById('kpi-total-validados').textContent = formatNum(tot);
 
-  // Badge variation: When looking at 2027 alone, show vs 2026 (+3.6%)
+  // Badge variation: When looking at 2027 alone, show vs 2026 dynamically
   const badge = document.getElementById('kpi-total-badge');
   const subtext = badge ? badge.nextElementSibling : null;
   if (badge) {
     if (state.filters.year === '2027') {
-      badge.className = 'font-bold text-emerald-600 dark:text-emerald-400 flex items-center';
-      badge.textContent = '↑ +3.6% (+3.227)';
+      let v26 = 0;
+      let v27 = 0;
+      if (state.filters.center !== 'ALL') {
+        const cData = agg.centers[state.filters.center];
+        v26 = cData ? cData['2026'] : 0;
+        v27 = cData ? cData['2027'] : 0;
+      } else {
+        Object.values(agg.centers).forEach(c => {
+          v26 += (c['2026'] || 0);
+          v27 += (c['2027'] || 0);
+        });
+      }
+      const diff = v27 - v26;
+      const diffPct = v26 > 0 ? ((diff / v26) * 100).toFixed(1) : '0.0';
+      const isPos = diff >= 0;
+      badge.className = `font-bold ${isPos ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'} flex items-center`;
+      badge.textContent = `${isPos ? '↑ +' : '↓ '}${diffPct}% (${isPos ? '+' : ''}${formatNum(diff)})`;
       if (subtext) {
         subtext.textContent = 'vs 2026';
         subtext.classList.remove('hidden');
@@ -1422,62 +1512,109 @@ function renderComparativeTable(agg) {
   const tbody = document.getElementById('table-centros-comparativa-body');
   if (!tbody) return;
 
-  const centers = [
-    'Centro de Salud Familiar  José Bauza Frau',
-    'Centro de Salud Familiar Batuco',
-    'Posta de Salud Rural Juan Pablo II de Lampa',
-    'Centro Comunitario de Salud Familiar Sol de Septiembre',
-    'Centro Comunitario de Salud Familiar Batuco'
-  ];
+  const isFilteredCenter = state.filters && state.filters.center !== 'ALL';
+  const thCol1 = document.getElementById('th-comparativa-col1');
+  const titleEl = document.getElementById('title-table-centros');
+  if (thCol1) {
+    thCol1.textContent = isFilteredCenter 
+      ? `Sector Territorial (${getShortCenterName(state.filters.center)})`
+      : 'Establecimiento';
+  }
+  if (titleEl) {
+    titleEl.textContent = isFilteredCenter
+      ? `Detalle Comparativo por Sector - ${getShortCenterName(state.filters.center)}`
+      : 'Detalle Comparativo por Establecimiento de Salud';
+  }
 
+  let rowsHtml = '';
   let total2026 = 0;
   let total2027 = 0;
 
-  // Pre-calculate sums for dynamic share calculation under any active filter
-  centers.forEach(c => {
-    const data = agg.centers[c] || { '2026': 0, '2027': 0 };
-    total2026 += (data['2026'] || 0);
-    total2027 += (data['2027'] || 0);
-  });
+  if (isFilteredCenter) {
+    const secEntries = Object.entries(agg.sectorsYear || {})
+      .sort((a, b) => (b[1]['2027'] || 0) - (a[1]['2027'] || 0));
 
-  const rowsHtml = centers.map(c => {
-    const data = agg.centers[c] || { '2026': 0, '2027': 0 };
-    const val26 = data['2026'] || 0;
-    const val27 = data['2027'] || 0;
+    secEntries.forEach(([sName, data]) => {
+      total2026 += (data['2026'] || 0);
+      total2027 += (data['2027'] || 0);
+    });
 
-    const diff = val27 - val26;
-    const diffPct = val26 > 0 ? ((diff / val26) * 100).toFixed(1) : '0.0';
-    const isPositive = diff >= 0;
-    const share27 = total2027 > 0 ? ((val27 / total2027) * 100).toFixed(1) : '0.0';
+    rowsHtml = secEntries.map(([sName, data]) => {
+      const val26 = data['2026'] || 0;
+      const val27 = data['2027'] || 0;
+      const diff = val27 - val26;
+      const diffPct = val26 > 0 ? ((diff / val26) * 100).toFixed(1) : '0.0';
+      const isPositive = diff >= 0;
+      const share27 = total2027 > 0 ? ((val27 / total2027) * 100).toFixed(1) : '0.0';
+      const label = sName === 'Sin Datos' ? 'Sin Datos / Comunal' : `Sector ${sName}`;
 
-    const shortName = c.replace('Centro de Salud Familiar  ', 'CESFAM ')
-                       .replace('Centro de Salud Familiar ', 'CESFAM ')
-                       .replace('Centro Comunitario de Salud Familiar ', 'CECOSF ')
-                       .replace('Posta de Salud Rural ', 'PSR ');
+      return `
+        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+          <td class="px-4 py-3 font-semibold text-slate-800 dark:text-slate-200">${label}</td>
+          <td class="px-4 py-3 text-right font-mono text-slate-600 dark:text-slate-400">${formatNum(val26)}</td>
+          <td class="px-4 py-3 text-right font-mono font-bold text-slate-900 dark:text-white">${formatNum(val27)}</td>
+          <td class="px-4 py-3 text-right font-mono font-semibold ${isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600'}">
+            ${isPositive ? '+' : ''}${formatNum(diff)}
+          </td>
+          <td class="px-4 py-3 text-right font-mono font-semibold ${isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600'}">
+            ${isPositive ? '+' : ''}${diffPct}%
+          </td>
+          <td class="px-4 py-3 text-right font-mono text-blue-600 dark:text-blue-400 font-bold">${share27}%</td>
+        </tr>
+      `;
+    }).join('');
+  } else {
+    const centers = [
+      'Centro de Salud Familiar  José Bauza Frau',
+      'Centro de Salud Familiar Batuco',
+      'Posta de Salud Rural Juan Pablo II de Lampa',
+      'Centro Comunitario de Salud Familiar Sol de Septiembre',
+      'Centro Comunitario de Salud Familiar Batuco'
+    ];
 
-    return `
-      <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
-        <td class="px-4 py-3 font-semibold text-slate-800 dark:text-slate-200">${shortName}</td>
-        <td class="px-4 py-3 text-right font-mono text-slate-600 dark:text-slate-400">${formatNum(val26)}</td>
-        <td class="px-4 py-3 text-right font-mono font-bold text-slate-900 dark:text-white">${formatNum(val27)}</td>
-        <td class="px-4 py-3 text-right font-mono font-semibold ${isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600'}">
-          ${isPositive ? '+' : ''}${formatNum(diff)}
-        </td>
-        <td class="px-4 py-3 text-right font-mono font-semibold ${isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600'}">
-          ${isPositive ? '+' : ''}${diffPct}%
-        </td>
-        <td class="px-4 py-3 text-right font-mono text-blue-600 dark:text-blue-400 font-bold">${share27}%</td>
-      </tr>
-    `;
-  }).join('');
+    centers.forEach(c => {
+      const data = agg.centers[c] || { '2026': 0, '2027': 0 };
+      total2026 += (data['2026'] || 0);
+      total2027 += (data['2027'] || 0);
+    });
+
+    rowsHtml = centers.map(c => {
+      const data = agg.centers[c] || { '2026': 0, '2027': 0 };
+      const val26 = data['2026'] || 0;
+      const val27 = data['2027'] || 0;
+      const diff = val27 - val26;
+      const diffPct = val26 > 0 ? ((diff / val26) * 100).toFixed(1) : '0.0';
+      const isPositive = diff >= 0;
+      const share27 = total2027 > 0 ? ((val27 / total2027) * 100).toFixed(1) : '0.0';
+      const shortName = getShortCenterName(c);
+
+      return `
+        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+          <td class="px-4 py-3 font-semibold text-slate-800 dark:text-slate-200">${shortName}</td>
+          <td class="px-4 py-3 text-right font-mono text-slate-600 dark:text-slate-400">${formatNum(val26)}</td>
+          <td class="px-4 py-3 text-right font-mono font-bold text-slate-900 dark:text-white">${formatNum(val27)}</td>
+          <td class="px-4 py-3 text-right font-mono font-semibold ${isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600'}">
+            ${isPositive ? '+' : ''}${formatNum(diff)}
+          </td>
+          <td class="px-4 py-3 text-right font-mono font-semibold ${isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600'}">
+            ${isPositive ? '+' : ''}${diffPct}%
+          </td>
+          <td class="px-4 py-3 text-right font-mono text-blue-600 dark:text-blue-400 font-bold">${share27}%</td>
+        </tr>
+      `;
+    }).join('');
+  }
 
   const totalDiff = total2027 - total2026;
   const totalDiffPct = total2026 > 0 ? ((totalDiff / total2026) * 100).toFixed(1) : '0.0';
   const isTotalPos = totalDiff >= 0;
+  const footerTitle = isFilteredCenter 
+    ? `TOTAL ${getShortCenterName(state.filters.center).toUpperCase()}`
+    : 'TOTAL COMUNA DE LAMPA';
 
   const footerHtml = `
     <tr class="bg-slate-100/80 dark:bg-slate-800 font-extrabold text-slate-900 dark:text-white border-t-2 border-slate-300 dark:border-slate-700">
-      <td class="px-4 py-3">TOTAL COMUNA DE LAMPA</td>
+      <td class="px-4 py-3 uppercase">${footerTitle}</td>
       <td class="px-4 py-3 text-right font-mono">${formatNum(total2026)}</td>
       <td class="px-4 py-3 text-right font-mono text-blue-600 dark:text-blue-400">${formatNum(total2027)}</td>
       <td class="px-4 py-3 text-right font-mono ${isTotalPos ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600'}">${isTotalPos ? '+' : ''}${formatNum(totalDiff)}</td>
@@ -1592,17 +1729,43 @@ function renderCentrosComparativaChart(agg) {
     agg = agg || state.currentAgg;
     if (!agg) return null;
 
-    const centers = [
-      'Centro de Salud Familiar  José Bauza Frau',
-      'Centro de Salud Familiar Batuco',
-      'Posta de Salud Rural Juan Pablo II de Lampa',
-      'Centro Comunitario de Salud Familiar Sol de Septiembre',
-      'Centro Comunitario de Salud Familiar Batuco'
-    ];
+    const isFilteredCenter = state.filters && state.filters.center !== 'ALL';
+    const titleEl = document.getElementById('title-centros-comparativa');
+    const subEl = document.getElementById('subtitle-centros-comparativa');
+    if (titleEl) {
+      titleEl.textContent = isFilteredCenter 
+        ? `Población Validada por Sector - ${getShortCenterName(state.filters.center)} (2026 vs 2027)`
+        : 'Población Validada por Centro de Salud (2026 vs 2027)';
+    }
+    if (subEl) {
+      subEl.textContent = isFilteredCenter
+        ? `Comparativa de inscritos per cápita validados por sector territorial del establecimiento`
+        : 'Comparativa de inscritos per cápita validados entre ambos períodos';
+    }
 
-    const labels = ['CESFAM Bauza Frau', 'CESFAM Batuco', 'PSR Juan Pablo II', 'CECOSF Sol Sept.', 'CECOSF Batuco'];
-    const data2026 = centers.map(c => agg.centers[c] ? agg.centers[c]['2026'] : 0);
-    const data2027 = centers.map(c => agg.centers[c] ? agg.centers[c]['2027'] : 0);
+    let labels = [];
+    let data2026 = [];
+    let data2027 = [];
+
+    if (isFilteredCenter) {
+      const secEntries = Object.entries(agg.sectorsYear || {})
+        .sort((a, b) => (b[1]['2027'] || 0) - (a[1]['2027'] || 0));
+      labels = secEntries.map(e => e[0] === 'Sin Datos' ? 'Sin Datos / Comunal' : `Sector ${e[0]}`);
+      data2026 = secEntries.map(e => e[1]['2026'] || 0);
+      data2027 = secEntries.map(e => e[1]['2027'] || 0);
+    } else {
+      const centers = [
+        'Centro de Salud Familiar  José Bauza Frau',
+        'Centro de Salud Familiar Batuco',
+        'Posta de Salud Rural Juan Pablo II de Lampa',
+        'Centro Comunitario de Salud Familiar Sol de Septiembre',
+        'Centro Comunitario de Salud Familiar Batuco'
+      ];
+
+      labels = ['CESFAM Bauza Frau', 'CESFAM Batuco', 'PSR Juan Pablo II', 'CECOSF Sol Sept.', 'CECOSF Batuco'];
+      data2026 = centers.map(c => agg.centers[c] ? agg.centers[c]['2026'] : 0);
+      data2027 = centers.map(c => agg.centers[c] ? agg.centers[c]['2027'] : 0);
+    }
 
     return {
       type: 'bar',
@@ -1938,28 +2101,51 @@ function renderTramosCentrosStackedChart(agg) {
     agg = agg || state.currentAgg;
     if (!agg) return null;
 
-    const centers = [
-      'Centro de Salud Familiar  José Bauza Frau',
-      'Centro de Salud Familiar Batuco',
-      'Posta de Salud Rural Juan Pablo II de Lampa',
-      'Centro Comunitario de Salud Familiar Sol de Septiembre',
-      'Centro Comunitario de Salud Familiar Batuco'
-    ];
-    const shortLabels = ['CESFAM Bauza', 'CESFAM Batuco', 'PSR Juan Pablo', 'CECOSF Sol', 'CECOSF Batuco'];
+    const isFilteredCenter = state.filters && state.filters.center !== 'ALL';
+    const titleEl = document.getElementById('title-tramos-stacked');
+    if (titleEl) {
+      titleEl.textContent = isFilteredCenter 
+        ? `Estructura de Tramos FONASA por Sector - ${getShortCenterName(state.filters.center)} (100% Apilado)`
+        : 'Estructura de Tramos FONASA por Centro de Salud (100% Apilado)';
+    }
 
-    const tcMap = agg.tramosCentros || {};
-    const getTramoPct = (tramoLetter) => {
-      return centers.map(c => {
-        const tc = tcMap[c] || { A: 0, B: 0, C: 0, D: 0, X: 0 };
-        const tot = (tc.A + tc.B + tc.C + tc.D + tc.X) || 1;
-        return parseFloat(((tc[tramoLetter] / tot) * 100).toFixed(1));
-      });
-    };
+    let labels = [];
+    let getTramoPct;
+
+    if (isFilteredCenter) {
+      const secKeys = Object.keys(agg.tramosSectores || {});
+      labels = secKeys.map(s => s === 'Sin Datos' ? 'Sin Datos / Comunal' : `Sector ${s}`);
+      getTramoPct = (tramoLetter) => {
+        return secKeys.map(s => {
+          const tc = agg.tramosSectores[s] || { A: 0, B: 0, C: 0, D: 0, X: 0 };
+          const tot = (tc.A + tc.B + tc.C + tc.D + tc.X) || 1;
+          return parseFloat(((tc[tramoLetter] / tot) * 100).toFixed(1));
+        });
+      };
+    } else {
+      const centers = [
+        'Centro de Salud Familiar  José Bauza Frau',
+        'Centro de Salud Familiar Batuco',
+        'Posta de Salud Rural Juan Pablo II de Lampa',
+        'Centro Comunitario de Salud Familiar Sol de Septiembre',
+        'Centro Comunitario de Salud Familiar Batuco'
+      ];
+      labels = ['CESFAM Bauza', 'CESFAM Batuco', 'PSR Juan Pablo', 'CECOSF Sol', 'CECOSF Batuco'];
+
+      const tcMap = agg.tramosCentros || {};
+      getTramoPct = (tramoLetter) => {
+        return centers.map(c => {
+          const tc = tcMap[c] || { A: 0, B: 0, C: 0, D: 0, X: 0 };
+          const tot = (tc.A + tc.B + tc.C + tc.D + tc.X) || 1;
+          return parseFloat(((tc[tramoLetter] / tot) * 100).toFixed(1));
+        });
+      };
+    }
 
     return {
       type: 'bar',
       data: {
-        labels: shortLabels,
+        labels: labels,
         datasets: [
           { label: 'Tramo A', data: getTramoPct('A'), backgroundColor: '#10b981' },
           { label: 'Tramo B', data: getTramoPct('B'), backgroundColor: '#0d9488' },
@@ -1994,25 +2180,17 @@ function renderTramosCentrosStackedChart(agg) {
 // Chart 7: Tramos Evolución 2026 vs 2027
 function renderTramosEvolucionChart(agg) {
   safeRenderChart('tramosEvolucion', 'chart-tramos-evolucion', () => {
+    agg = agg || state.currentAgg;
+    if (!agg) return null;
+
     const labels = ['Tramo A (Gratuidad)', 'Tramo B', 'Tramo C', 'Tramo D', 'Tramo X'];
     const tramosKeys = ['A', 'B', 'C', 'D', 'X'];
 
-    // Official validated distribution
-    let ev26 = { A: 29775, B: 24707, C: 12217, D: 18451, X: 3886 };
-    let ev27 = { A: 31264, B: 25220, C: 12402, D: 19123, X: 4254 };
+    const ev26 = agg.tramosEvolucion ? agg.tramosEvolucion['2026'] : {};
+    const ev27 = agg.tramosEvolucion ? agg.tramosEvolucion['2027'] : {};
 
-    if (state.comparativeData && state.comparativeData.tramos) {
-      const ct = state.comparativeData.tramos;
-      tramosKeys.forEach(k => {
-        if (ct[k]) {
-          ev26[k] = ct[k]['26'] || ev26[k];
-          ev27[k] = ct[k]['27'] || ev27[k];
-        }
-      });
-    }
-
-    const tramos2026 = tramosKeys.map(t => ev26[t]);
-    const tramos2027 = tramosKeys.map(t => ev27[t]);
+    const tramos2026 = tramosKeys.map(t => ev26[t] || 0);
+    const tramos2027 = tramosKeys.map(t => ev27[t] || 0);
 
     return {
       type: 'bar',
@@ -2055,59 +2233,99 @@ function renderTramosEvolucionChart(agg) {
   });
 }
 
-// Detailed Tramos Breakdown Table by Center
+// Detailed Tramos Breakdown Table by Center / Sector
 function renderTramosDetailTable(agg) {
   const tbody = document.getElementById('table-tramos-centros-body');
   if (!tbody) return;
   agg = agg || state.currentAgg;
   if (!agg) return;
 
-  const centers = [
-    'Centro de Salud Familiar  José Bauza Frau',
-    'Centro de Salud Familiar Batuco',
-    'Posta de Salud Rural Juan Pablo II de Lampa',
-    'Centro Comunitario de Salud Familiar Sol de Septiembre',
-    'Centro Comunitario de Salud Familiar Batuco'
-  ];
-  const shortNames = {
-    'Centro de Salud Familiar  José Bauza Frau': 'CESFAM José Bauza Frau',
-    'Centro de Salud Familiar Batuco': 'CESFAM Batuco',
-    'Posta de Salud Rural Juan Pablo II de Lampa': 'PSR Juan Pablo II de Lampa',
-    'Centro Comunitario de Salud Familiar Sol de Septiembre': 'CECOSF Sol de Septiembre',
-    'Centro Comunitario de Salud Familiar Batuco': 'CECOSF Batuco'
-  };
+  const isFilteredCenter = state.filters && state.filters.center !== 'ALL';
+  const thCol1 = document.getElementById('th-tramos-col1');
+  const titleEl = document.getElementById('title-table-tramos');
+  if (thCol1) {
+    thCol1.textContent = isFilteredCenter 
+      ? `Sector Territorial (${getShortCenterName(state.filters.center)})`
+      : 'Establecimiento';
+  }
+  if (titleEl) {
+    titleEl.textContent = isFilteredCenter
+      ? `Distribución Detallada de Tramos FONASA - ${getShortCenterName(state.filters.center)}`
+      : 'Distribución Detallada de Tramos FONASA por Establecimiento';
+  }
 
-  const tcMap = agg.tramosCentros || {};
   let totalComuna = 0, totA = 0, totB = 0, totC = 0, totD = 0, totX = 0;
+  let rowsHtml = '';
 
-  const rowsHtml = centers.map(c => {
-    const tc = tcMap[c] || { A: 0, B: 0, C: 0, D: 0, X: 0 };
-    const centerTot = (tc.A + tc.B + tc.C + tc.D + tc.X) || 0;
-    const vuln = tc.A + tc.B;
-    const vulnRate = centerTot > 0 ? ((vuln / centerTot) * 100).toFixed(1) + '%' : '0.0%';
+  if (isFilteredCenter) {
+    const secEntries = Object.entries(agg.tramosSectores || {});
+    rowsHtml = secEntries.map(([sName, tc]) => {
+      const secTot = (tc.A + tc.B + tc.C + tc.D + tc.X) || 0;
+      const vuln = tc.A + tc.B;
+      const vulnRate = secTot > 0 ? ((vuln / secTot) * 100).toFixed(1) + '%' : '0.0%';
 
-    totalComuna += centerTot;
-    totA += tc.A; totB += tc.B; totC += tc.C; totD += tc.D; totX += tc.X;
+      totalComuna += secTot;
+      totA += tc.A; totB += tc.B; totC += tc.C; totD += tc.D; totX += tc.X;
 
-    return `
-      <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
-        <td class="px-3.5 py-2.5 font-semibold text-slate-800 dark:text-slate-200">${shortNames[c] || c}</td>
-        <td class="px-3.5 py-2.5 text-right font-mono font-bold text-slate-900 dark:text-white">${formatNum(centerTot)}</td>
-        <td class="px-3.5 py-2.5 text-right font-mono text-emerald-600 dark:text-emerald-400 font-semibold">${formatNum(tc.A)}</td>
-        <td class="px-3.5 py-2.5 text-right font-mono text-teal-600 dark:text-teal-400 font-semibold">${formatNum(tc.B)}</td>
-        <td class="px-3.5 py-2.5 text-right font-mono text-blue-600 dark:text-blue-400 font-semibold">${formatNum(tc.C)}</td>
-        <td class="px-3.5 py-2.5 text-right font-mono text-indigo-600 dark:text-indigo-400 font-semibold">${formatNum(tc.D)}</td>
-        <td class="px-3.5 py-2.5 text-right font-mono text-slate-500 font-semibold">${formatNum(tc.X)}</td>
-        <td class="px-3.5 py-2.5 text-right font-mono font-bold text-teal-700 dark:text-teal-300">${vulnRate}</td>
-      </tr>
-    `;
-  }).join('');
+      const label = sName === 'Sin Datos' ? 'Sin Datos / Comunal' : `Sector ${sName}`;
+
+      return `
+        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+          <td class="px-3.5 py-2.5 font-semibold text-slate-800 dark:text-slate-200">${label}</td>
+          <td class="px-3.5 py-2.5 text-right font-mono font-bold text-slate-900 dark:text-white">${formatNum(secTot)}</td>
+          <td class="px-3.5 py-2.5 text-right font-mono text-emerald-600 dark:text-emerald-400 font-semibold">${formatNum(tc.A)}</td>
+          <td class="px-3.5 py-2.5 text-right font-mono text-teal-600 dark:text-teal-400 font-semibold">${formatNum(tc.B)}</td>
+          <td class="px-3.5 py-2.5 text-right font-mono text-blue-600 dark:text-blue-400 font-semibold">${formatNum(tc.C)}</td>
+          <td class="px-3.5 py-2.5 text-right font-mono text-indigo-600 dark:text-indigo-400 font-semibold">${formatNum(tc.D)}</td>
+          <td class="px-3.5 py-2.5 text-right font-mono text-slate-500 font-semibold">${formatNum(tc.X)}</td>
+          <td class="px-3.5 py-2.5 text-right font-mono font-bold text-teal-700 dark:text-teal-300">${vulnRate}</td>
+        </tr>
+      `;
+    }).join('');
+  } else {
+    const centers = [
+      'Centro de Salud Familiar  José Bauza Frau',
+      'Centro de Salud Familiar Batuco',
+      'Posta de Salud Rural Juan Pablo II de Lampa',
+      'Centro Comunitario de Salud Familiar Sol de Septiembre',
+      'Centro Comunitario de Salud Familiar Batuco'
+    ];
+    const tcMap = agg.tramosCentros || {};
+
+    rowsHtml = centers.map(c => {
+      const tc = tcMap[c] || { A: 0, B: 0, C: 0, D: 0, X: 0 };
+      const centerTot = (tc.A + tc.B + tc.C + tc.D + tc.X) || 0;
+      const vuln = tc.A + tc.B;
+      const vulnRate = centerTot > 0 ? ((vuln / centerTot) * 100).toFixed(1) + '%' : '0.0%';
+
+      totalComuna += centerTot;
+      totA += tc.A; totB += tc.B; totC += tc.C; totD += tc.D; totX += tc.X;
+      const shortName = getShortCenterName(c);
+
+      return `
+        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+          <td class="px-3.5 py-2.5 font-semibold text-slate-800 dark:text-slate-200">${shortName}</td>
+          <td class="px-3.5 py-2.5 text-right font-mono font-bold text-slate-900 dark:text-white">${formatNum(centerTot)}</td>
+          <td class="px-3.5 py-2.5 text-right font-mono text-emerald-600 dark:text-emerald-400 font-semibold">${formatNum(tc.A)}</td>
+          <td class="px-3.5 py-2.5 text-right font-mono text-teal-600 dark:text-teal-400 font-semibold">${formatNum(tc.B)}</td>
+          <td class="px-3.5 py-2.5 text-right font-mono text-blue-600 dark:text-blue-400 font-semibold">${formatNum(tc.C)}</td>
+          <td class="px-3.5 py-2.5 text-right font-mono text-indigo-600 dark:text-indigo-400 font-semibold">${formatNum(tc.D)}</td>
+          <td class="px-3.5 py-2.5 text-right font-mono text-slate-500 font-semibold">${formatNum(tc.X)}</td>
+          <td class="px-3.5 py-2.5 text-right font-mono font-bold text-teal-700 dark:text-teal-300">${vulnRate}</td>
+        </tr>
+      `;
+    }).join('');
+  }
 
   const totVuln = totA + totB;
   const totVulnRate = totalComuna > 0 ? ((totVuln / totalComuna) * 100).toFixed(1) + '%' : '0.0%';
+  const footerTitle = isFilteredCenter 
+    ? `TOTAL ${getShortCenterName(state.filters.center).toUpperCase()}`
+    : 'TOTAL COMUNAL LAMPA';
+
   const footerHtml = `
     <tr class="bg-slate-100/90 dark:bg-slate-800/90 font-extrabold text-slate-900 dark:text-white border-t-2 border-slate-300 dark:border-slate-700">
-      <td class="px-3.5 py-3 uppercase">Total Comunal Lampa</td>
+      <td class="px-3.5 py-3 uppercase">${footerTitle}</td>
       <td class="px-3.5 py-3 text-right font-mono">${formatNum(totalComuna)}</td>
       <td class="px-3.5 py-3 text-right font-mono text-emerald-600 dark:text-emerald-400">${formatNum(totA)}</td>
       <td class="px-3.5 py-3 text-right font-mono text-teal-600 dark:text-teal-400">${formatNum(totB)}</td>
@@ -2223,19 +2441,40 @@ function renderProgramasCentrosChart(agg) {
     agg = agg || state.currentAgg;
     if (!agg) return null;
 
-    const centers = [
-      'Centro de Salud Familiar  José Bauza Frau',
-      'Centro de Salud Familiar Batuco',
-      'Posta de Salud Rural Juan Pablo II de Lampa',
-      'Centro Comunitario de Salud Familiar Sol de Septiembre',
-      'Centro Comunitario de Salud Familiar Batuco'
-    ];
-    const shortLabels = ['CESFAM Bauza', 'CESFAM Batuco', 'PSR Juan Pablo', 'CECOSF Sol', 'CECOSF Batuco'];
+    const isFilteredCenter = state.filters && state.filters.center !== 'ALL';
+    const titleEl = document.getElementById('title-programas-centros');
+    if (titleEl) {
+      titleEl.textContent = isFilteredCenter 
+        ? `Distribución de Programas Prioritarios por Sector - ${getShortCenterName(state.filters.center)}`
+        : 'Distribución Territorial de Programas Prioritarios por Centro';
+    }
 
-    const progCentros = agg.programasCentros || {};
-    const praisData = centers.map(c => progCentros[c] ? progCentros[c].prais : 0);
-    const discData = centers.map(c => progCentros[c] ? progCentros[c].discapacidad : 0);
-    const cuidData = centers.map(c => progCentros[c] ? progCentros[c].cuidadores : 0);
+    let shortLabels = [];
+    let praisData = [];
+    let discData = [];
+    let cuidData = [];
+
+    if (isFilteredCenter) {
+      const secEntries = Object.entries(agg.programasSectores || {});
+      shortLabels = secEntries.map(e => e[0] === 'Sin Datos' ? 'Sin Datos' : `Sector ${e[0]}`);
+      praisData = secEntries.map(e => e[1].prais || 0);
+      discData = secEntries.map(e => e[1].discapacidad || 0);
+      cuidData = secEntries.map(e => e[1].cuidadores || 0);
+    } else {
+      const centers = [
+        'Centro de Salud Familiar  José Bauza Frau',
+        'Centro de Salud Familiar Batuco',
+        'Posta de Salud Rural Juan Pablo II de Lampa',
+        'Centro Comunitario de Salud Familiar Sol de Septiembre',
+        'Centro Comunitario de Salud Familiar Batuco'
+      ];
+      shortLabels = ['CESFAM Bauza', 'CESFAM Batuco', 'PSR Juan Pablo', 'CECOSF Sol', 'CECOSF Batuco'];
+
+      const progCentros = agg.programasCentros || {};
+      praisData = centers.map(c => progCentros[c] ? progCentros[c].prais : 0);
+      discData = centers.map(c => progCentros[c] ? progCentros[c].discapacidad : 0);
+      cuidData = centers.map(c => progCentros[c] ? progCentros[c].cuidadores : 0);
+    }
 
     return {
       type: 'bar',
@@ -2291,73 +2530,114 @@ function renderInclusionDetailTable(agg) {
   agg = agg || state.currentAgg;
   if (!agg) return;
 
-  const centers = [
-    'Centro de Salud Familiar  José Bauza Frau',
-    'Centro de Salud Familiar Batuco',
-    'Posta de Salud Rural Juan Pablo II de Lampa',
-    'Centro Comunitario de Salud Familiar Sol de Septiembre',
-    'Centro Comunitario de Salud Familiar Batuco'
-  ];
-  const shortNames = {
-    'Centro de Salud Familiar  José Bauza Frau': 'CESFAM José Bauza Frau',
-    'Centro de Salud Familiar Batuco': 'CESFAM Batuco',
-    'Posta de Salud Rural Juan Pablo II de Lampa': 'PSR Juan Pablo II de Lampa',
-    'Centro Comunitario de Salud Familiar Sol de Septiembre': 'CECOSF Sol de Septiembre',
-    'Centro Comunitario de Salud Familiar Batuco': 'CECOSF Batuco'
-  };
-
-  const raw = state.filteredData;
-  const len = raw.length;
-
-  const statsByCenter = {};
-  centers.forEach(c => {
-    statsByCenter[c] = { total: 0, migrantes: 0, etnias: 0, prais: 0, disc: 0, cuid: 0 };
-  });
-
-  for (let i = 0; i < len; i++) {
-    const item = raw[i];
-    const c = item.c;
-    if (!statsByCenter[c]) continue;
-    statsByCenter[c].total++;
-    const isMigrant = item.n && item.n !== 'Chile' && item.n !== 'Desconocido' && item.n !== 'Sin Datos' && item.n !== '';
-    if (isMigrant) statsByCenter[c].migrantes++;
-    if (item.et && item.et !== 'No tiene' && item.et !== 'Sin Datos' && item.et !== 'No responde' && item.et !== 'Otro (Especificar)') statsByCenter[c].etnias++;
-    if (item.p) statsByCenter[c].prais++;
-    if (item.d) statsByCenter[c].disc++;
-    if (item.cd) statsByCenter[c].cuid++;
+  const isFilteredCenter = state.filters && state.filters.center !== 'ALL';
+  const thCol1 = document.getElementById('th-inclusion-col1');
+  const titleEl = document.getElementById('title-table-inclusion');
+  if (thCol1) {
+    thCol1.textContent = isFilteredCenter 
+      ? `Sector Territorial (${getShortCenterName(state.filters.center)})`
+      : 'Establecimiento';
+  }
+  if (titleEl) {
+    titleEl.textContent = isFilteredCenter
+      ? `Migración, Etnias y Programas por Sector - ${getShortCenterName(state.filters.center)}`
+      : 'Distribución Territorial de Migración, Etnias y Programas por Establecimiento';
   }
 
   let totInsc = 0, totMig = 0, totEtn = 0, totPra = 0, totDis = 0, totCui = 0;
+  let rowsHtml = '';
 
-  const rowsHtml = centers.map(c => {
-    const s = statsByCenter[c];
-    const migPct = s.total > 0 ? ((s.migrantes / s.total) * 100).toFixed(1) + '%' : '0.0%';
+  if (isFilteredCenter) {
+    const secEntries = Object.entries(agg.programasSectores || {});
+    rowsHtml = secEntries.map(([sName, s]) => {
+      const migPct = s.total > 0 ? ((s.migrantes / s.total) * 100).toFixed(1) + '%' : '0.0%';
 
-    totInsc += s.total;
-    totMig += s.migrantes;
-    totEtn += s.etnias;
-    totPra += s.prais;
-    totDis += s.disc;
-    totCui += s.cuid;
+      totInsc += s.total;
+      totMig += s.migrantes;
+      totEtn += s.etnias;
+      totPra += s.prais;
+      totDis += s.discapacidad;
+      totCui += s.cuidadores;
 
-    return `
-      <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
-        <td class="px-3.5 py-2.5 font-semibold text-slate-800 dark:text-slate-200">${shortNames[c] || c}</td>
-        <td class="px-3.5 py-2.5 text-right font-mono font-bold text-slate-900 dark:text-white">${formatNum(s.total)}</td>
-        <td class="px-3.5 py-2.5 text-right font-mono text-indigo-600 dark:text-indigo-400 font-semibold">${formatNum(s.migrantes)}</td>
-        <td class="px-3.5 py-2.5 text-right font-mono font-bold text-indigo-700 dark:text-indigo-300">${migPct}</td>
-        <td class="px-3.5 py-2.5 text-right font-mono text-amber-600 dark:text-amber-400 font-semibold">${formatNum(s.etnias)}</td>
-        <td class="px-3.5 py-2.5 text-right font-mono text-purple-600 dark:text-purple-400 font-semibold">${formatNum(s.prais)}</td>
-        <td class="px-3.5 py-2.5 text-right font-mono text-blue-600 dark:text-blue-400 font-semibold">${formatNum(s.disc)}</td>
-        <td class="px-3.5 py-2.5 text-right font-mono text-emerald-600 dark:text-emerald-400 font-semibold">${formatNum(s.cuid)}</td>
-      </tr>
-    `;
-  }).join('');
+      const label = sName === 'Sin Datos' ? 'Sin Datos / Comunal' : `Sector ${sName}`;
+
+      return `
+        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+          <td class="px-3.5 py-2.5 font-semibold text-slate-800 dark:text-slate-200">${label}</td>
+          <td class="px-3.5 py-2.5 text-right font-mono font-bold text-slate-900 dark:text-white">${formatNum(s.total)}</td>
+          <td class="px-3.5 py-2.5 text-right font-mono text-indigo-600 dark:text-indigo-400 font-semibold">${formatNum(s.migrantes)}</td>
+          <td class="px-3.5 py-2.5 text-right font-mono font-bold text-indigo-700 dark:text-indigo-300">${migPct}</td>
+          <td class="px-3.5 py-2.5 text-right font-mono text-amber-600 dark:text-amber-400 font-semibold">${formatNum(s.etnias)}</td>
+          <td class="px-3.5 py-2.5 text-right font-mono text-purple-600 dark:text-purple-400 font-semibold">${formatNum(s.prais)}</td>
+          <td class="px-3.5 py-2.5 text-right font-mono text-blue-600 dark:text-blue-400 font-semibold">${formatNum(s.discapacidad)}</td>
+          <td class="px-3.5 py-2.5 text-right font-mono text-emerald-600 dark:text-emerald-400 font-semibold">${formatNum(s.cuidadores)}</td>
+        </tr>
+      `;
+    }).join('');
+  } else {
+    const centers = [
+      'Centro de Salud Familiar  José Bauza Frau',
+      'Centro de Salud Familiar Batuco',
+      'Posta de Salud Rural Juan Pablo II de Lampa',
+      'Centro Comunitario de Salud Familiar Sol de Septiembre',
+      'Centro Comunitario de Salud Familiar Batuco'
+    ];
+    const raw = state.filteredData;
+    const len = raw.length;
+
+    const statsByCenter = {};
+    centers.forEach(c => {
+      statsByCenter[c] = { total: 0, migrantes: 0, etnias: 0, prais: 0, disc: 0, cuid: 0 };
+    });
+
+    for (let i = 0; i < len; i++) {
+      const item = raw[i];
+      const c = item.c;
+      if (!statsByCenter[c]) continue;
+      statsByCenter[c].total++;
+      const isMigrant = item.n && item.n !== 'Chile' && item.n !== 'Desconocido' && item.n !== 'Sin Datos' && item.n !== '';
+      if (isMigrant) statsByCenter[c].migrantes++;
+      if (item.et && item.et !== 'No tiene' && item.et !== 'Sin Datos' && item.et !== 'No responde' && item.et !== 'Otro (Especificar)') statsByCenter[c].etnias++;
+      if (item.p) statsByCenter[c].prais++;
+      if (item.d) statsByCenter[c].disc++;
+      if (item.cd) statsByCenter[c].cuid++;
+    }
+
+    rowsHtml = centers.map(c => {
+      const s = statsByCenter[c];
+      const migPct = s.total > 0 ? ((s.migrantes / s.total) * 100).toFixed(1) + '%' : '0.0%';
+
+      totInsc += s.total;
+      totMig += s.migrantes;
+      totEtn += s.etnias;
+      totPra += s.prais;
+      totDis += s.disc;
+      totCui += s.cuid;
+      const shortName = getShortCenterName(c);
+
+      return `
+        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+          <td class="px-3.5 py-2.5 font-semibold text-slate-800 dark:text-slate-200">${shortName}</td>
+          <td class="px-3.5 py-2.5 text-right font-mono font-bold text-slate-900 dark:text-white">${formatNum(s.total)}</td>
+          <td class="px-3.5 py-2.5 text-right font-mono text-indigo-600 dark:text-indigo-400 font-semibold">${formatNum(s.migrantes)}</td>
+          <td class="px-3.5 py-2.5 text-right font-mono font-bold text-indigo-700 dark:text-indigo-300">${migPct}</td>
+          <td class="px-3.5 py-2.5 text-right font-mono text-amber-600 dark:text-amber-400 font-semibold">${formatNum(s.etnias)}</td>
+          <td class="px-3.5 py-2.5 text-right font-mono text-purple-600 dark:text-purple-400 font-semibold">${formatNum(s.prais)}</td>
+          <td class="px-3.5 py-2.5 text-right font-mono text-blue-600 dark:text-blue-400 font-semibold">${formatNum(s.disc)}</td>
+          <td class="px-3.5 py-2.5 text-right font-mono text-emerald-600 dark:text-emerald-400 font-semibold">${formatNum(s.cuid)}</td>
+        </tr>
+      `;
+    }).join('');
+  }
 
   const totMigPct = totInsc > 0 ? ((totMig / totInsc) * 100).toFixed(1) + '%' : '0.0%';
+  const footerTitle = isFilteredCenter 
+    ? `TOTAL ${getShortCenterName(state.filters.center).toUpperCase()}`
+    : 'TOTAL COMUNAL LAMPA';
+
   const footerHtml = `
     <tr class="bg-slate-100/90 dark:bg-slate-800/90 font-extrabold text-slate-900 dark:text-white border-t-2 border-slate-300 dark:border-slate-700">
-      <td class="px-3.5 py-3 uppercase">Total Comunal Lampa</td>
+      <td class="px-3.5 py-3 uppercase">${footerTitle}</td>
       <td class="px-3.5 py-3 text-right font-mono">${formatNum(totInsc)}</td>
       <td class="px-3.5 py-3 text-right font-mono text-indigo-600 dark:text-indigo-400">${formatNum(totMig)}</td>
       <td class="px-3.5 py-3 text-right font-mono text-indigo-700 dark:text-indigo-300">${totMigPct}</td>
@@ -2495,10 +2775,14 @@ function renderComparativaModule() {
   const raw = state.rawData;
   const len = raw.length;
 
+  const isFilteredCenter = state.filters && state.filters.center !== 'ALL';
+  const fCenter = isFilteredCenter ? state.filters.center : null;
+
   const comp = {
     total26: 0,
     total27: 0,
     centros: {},
+    sectores: {},
     tramos: { A: { '26': 0, '27': 0 }, B: { '26': 0, '27': 0 }, C: { '26': 0, '27': 0 }, D: { '26': 0, '27': 0 }, X: { '26': 0, '27': 0 } },
     edades: {},
     naciones: {},
@@ -2530,6 +2814,9 @@ function renderComparativaModule() {
     const is27 = item.y === '2027';
     if (!is26 && !is27) continue;
 
+    // Filter by selected health center if active
+    if (isFilteredCenter && item.c !== fCenter) continue;
+
     const yKey = is26 ? '26' : '27';
     if (is26) comp.total26++;
     else comp.total27++;
@@ -2537,6 +2824,12 @@ function renderComparativaModule() {
     if (comp.centros[item.c]) {
       comp.centros[item.c][yKey]++;
     }
+
+    const sKey = item.s || 'Sin Datos';
+    if (!comp.sectores[sKey]) {
+      comp.sectores[sKey] = { '26': 0, '27': 0 };
+    }
+    comp.sectores[sKey][yKey]++;
 
     if (comp.tramos[item.t]) {
       comp.tramos[item.t][yKey]++;
@@ -2562,6 +2855,25 @@ function renderComparativaModule() {
 
   state.comparativeData = comp;
 
+  // Dynamic Titles and Option labels for Establishment / Sector
+  const titleDelta = document.getElementById('title-comparativa-centros-delta');
+  const subtitleDelta = document.getElementById('subtitle-comparativa-centros-delta');
+  const optDimCentros = document.getElementById('opt-dim-centros');
+
+  if (titleDelta) {
+    titleDelta.textContent = isFilteredCenter
+      ? `Variación Neta por Sector - ${getShortCenterName(fCenter)}`
+      : 'Variación Neta por Establecimiento de Salud';
+  }
+  if (subtitleDelta) {
+    subtitleDelta.textContent = isFilteredCenter
+      ? `Incremento absoluto de población validada en sectores de ${getShortCenterName(fCenter)} (2027 vs 2026)`
+      : 'Incremento absoluto de población validada (2027 vs 2026)';
+  }
+  if (optDimCentros) {
+    optDimCentros.textContent = isFilteredCenter ? 'Sectores del Centro' : 'Establecimientos de Salud';
+  }
+
   renderComparativaCentrosDeltaChart(comp);
   renderComparativaTramosDeltaChart(comp);
   renderComparativaEdadesDeltaChart(comp);
@@ -2572,25 +2884,42 @@ function renderComparativaModule() {
   renderMatrizComparativaTable(currDim);
 }
 
-// Chart: Delta Centros
+// Chart: Delta Centros / Sectores
 function renderComparativaCentrosDeltaChart(comp) {
   safeRenderChart('compCentrosDelta', 'chart-comparativa-centros-delta', () => {
     comp = comp || state.comparativeData;
     if (!comp) return null;
 
-    const centers = [
-      { key: 'Centro de Salud Familiar  José Bauza Frau', label: 'CESFAM Bauza Frau' },
-      { key: 'Centro Comunitario de Salud Familiar Sol de Septiembre', label: 'CECOSF Sol de Septiembre' },
-      { key: 'Posta de Salud Rural Juan Pablo II de Lampa', label: 'PSR Juan Pablo II' },
-      { key: 'Centro de Salud Familiar Batuco', label: 'CESFAM Batuco' },
-      { key: 'Centro Comunitario de Salud Familiar Batuco', label: 'CECOSF Batuco' }
-    ];
+    const isFilteredCenter = state.filters && state.filters.center !== 'ALL';
 
-    const labels = centers.map(c => c.label);
-    const deltas = centers.map(c => {
-      const data = comp.centros[c.key] || { '26': 0, '27': 0 };
-      return data['27'] - data['26'];
-    });
+    let labels = [];
+    let deltas = [];
+
+    if (isFilteredCenter) {
+      const secEntries = Object.entries(comp.sectores || {}).sort((a, b) => {
+        const deltaA = (a[1]['27'] || 0) - (a[1]['26'] || 0);
+        const deltaB = (b[1]['27'] || 0) - (b[1]['26'] || 0);
+        return deltaB - deltaA;
+      });
+      labels = secEntries.map(([sName]) => sName === 'Sin Datos' ? 'Sin Datos / Comunal' : `Sector ${sName}`);
+      deltas = secEntries.map(([, data]) => (data['27'] || 0) - (data['26'] || 0));
+    } else {
+      const centers = [
+        { key: 'Centro de Salud Familiar  José Bauza Frau', label: 'CESFAM Bauza Frau' },
+        { key: 'Centro Comunitario de Salud Familiar Sol de Septiembre', label: 'CECOSF Sol de Septiembre' },
+        { key: 'Posta de Salud Rural Juan Pablo II de Lampa', label: 'PSR Juan Pablo II' },
+        { key: 'Centro de Salud Familiar Batuco', label: 'CESFAM Batuco' },
+        { key: 'Centro Comunitario de Salud Familiar Batuco', label: 'CECOSF Batuco' }
+      ];
+
+      labels = centers.map(c => c.label);
+      deltas = centers.map(c => {
+        const data = comp.centros[c.key] || { '26': 0, '27': 0 };
+        return data['27'] - data['26'];
+      });
+    }
+
+    const bgColors = deltas.map(d => d >= 0 ? 'rgba(37, 99, 235, 0.85)' : 'rgba(239, 68, 68, 0.85)');
 
     return {
       type: 'bar',
@@ -2599,7 +2928,7 @@ function renderComparativaCentrosDeltaChart(comp) {
         datasets: [{
           label: 'Variación Neta 2026-2027',
           data: deltas,
-          backgroundColor: 'rgba(37, 99, 235, 0.85)',
+          backgroundColor: bgColors,
           borderRadius: 6
         }]
       },
@@ -2611,14 +2940,19 @@ function renderComparativaCentrosDeltaChart(comp) {
           legend: { display: false },
           tooltip: {
             callbacks: {
-              label: (ctx) => ` +${formatNum(ctx.raw)} nuevos inscritos`
+              label: (ctx) => {
+                const prefix = ctx.raw >= 0 ? '+' : '';
+                return ` ${prefix}${formatNum(ctx.raw)} nuevos inscritos`;
+              }
             }
           }
         },
         scales: {
           x: {
             beginAtZero: true,
-            ticks: { callback: (v) => `+${formatNum(v)}` }
+            ticks: {
+              callback: (v) => (v >= 0 ? `+${formatNum(v)}` : formatNum(v))
+            }
           },
           y: { grid: { display: false } }
         }
@@ -2785,27 +3119,38 @@ function renderMatrizComparativaTable(dimension) {
   if (!tbody || !state.comparativeData) return;
 
   const comp = state.comparativeData;
-  const totalGrowth = comp.total27 - comp.total26; // 3227
+  const isFilteredCenter = state.filters && state.filters.center !== 'ALL';
+  const totalGrowth = comp.total27 - comp.total26;
 
   let rows = [];
 
   if (dimension === 'centros') {
-    const centers = [
-      'Centro de Salud Familiar  José Bauza Frau',
-      'Centro Comunitario de Salud Familiar Sol de Septiembre',
-      'Posta de Salud Rural Juan Pablo II de Lampa',
-      'Centro de Salud Familiar Batuco',
-      'Centro Comunitario de Salud Familiar Batuco'
-    ];
-    rows = centers.map(c => {
-      const v26 = comp.centros[c]['26'];
-      const v27 = comp.centros[c]['27'];
-      const shortName = c.replace('Centro de Salud Familiar  ', 'CESFAM ')
-                         .replace('Centro de Salud Familiar ', 'CESFAM ')
-                         .replace('Centro Comunitario de Salud Familiar ', 'CECOSF ')
-                         .replace('Posta de Salud Rural ', 'PSR ');
-      return { name: shortName, v26, v27 };
-    });
+    if (isFilteredCenter) {
+      const secEntries = Object.entries(comp.sectores || {}).sort((a, b) => {
+        const deltaA = (a[1]['27'] || 0) - (a[1]['26'] || 0);
+        const deltaB = (b[1]['27'] || 0) - (b[1]['26'] || 0);
+        return deltaB - deltaA;
+      });
+      rows = secEntries.map(([sName, data]) => ({
+        name: sName === 'Sin Datos' ? 'Sin Datos / Comunal' : `Sector ${sName}`,
+        v26: data['26'] || 0,
+        v27: data['27'] || 0
+      }));
+    } else {
+      const centers = [
+        'Centro de Salud Familiar  José Bauza Frau',
+        'Centro Comunitario de Salud Familiar Sol de Septiembre',
+        'Posta de Salud Rural Juan Pablo II de Lampa',
+        'Centro de Salud Familiar Batuco',
+        'Centro Comunitario de Salud Familiar Batuco'
+      ];
+      rows = centers.map(c => {
+        const v26 = comp.centros[c] ? comp.centros[c]['26'] : 0;
+        const v27 = comp.centros[c] ? comp.centros[c]['27'] : 0;
+        const shortName = getShortCenterName(c);
+        return { name: shortName, v26, v27 };
+      });
+    }
   } else if (dimension === 'tramos') {
     rows = ['A', 'B', 'C', 'D', 'X'].map(t => ({
       name: `Tramo FONASA ${t}`,
@@ -2838,7 +3183,7 @@ function renderMatrizComparativaTable(dimension) {
   tbody.innerHTML = rows.map(r => {
     const delta = r.v27 - r.v26;
     const deltaPct = r.v26 > 0 ? ((delta / r.v26) * 100).toFixed(2) : '0.00';
-    const aportePct = totalGrowth > 0 ? ((delta / totalGrowth) * 100).toFixed(1) : '0.0';
+    const aportePct = totalGrowth !== 0 ? ((delta / totalGrowth) * 100).toFixed(1) : '0.0';
     const isPos = delta >= 0;
 
     return `
@@ -2873,10 +3218,32 @@ function updateSimuladorCalculations() {
   const elValIndex = document.getElementById('sim-val-indexado');
   if (elValIndex) elValIndex.textContent = `$${formatNum(valIndexado)} CLP`;
 
-  const total26 = 89036;
-  const total27 = 92263;
-  const deltaTotal = total27 - total26; // 3227
+  const isFilteredCenter = state.filters && state.filters.center !== 'ALL';
+  const fCenter = isFilteredCenter ? state.filters.center : null;
 
+  const centers = [
+    { key: 'Centro de Salud Familiar  José Bauza Frau', name: 'CESFAM José Bauza Frau', v26: 47336, v27: 48948 },
+    { key: 'Centro de Salud Familiar Batuco', name: 'CESFAM Batuco', v26: 16853, v27: 17130 },
+    { key: 'Posta de Salud Rural Juan Pablo II de Lampa', name: 'PSR Juan Pablo II de Lampa', v26: 10803, v27: 11314 },
+    { key: 'Centro Comunitario de Salud Familiar Sol de Septiembre', name: 'CECOSF Sol de Septiembre', v26: 6962, v27: 7564 },
+    { key: 'Centro Comunitario de Salud Familiar Batuco', name: 'CECOSF Batuco', v26: 7082, v27: 7307 }
+  ];
+
+  let total26 = 89036;
+  let total27 = 92263;
+
+  if (isFilteredCenter) {
+    const matched = centers.find(c => c.key === fCenter);
+    if (matched) {
+      total26 = matched.v26;
+      total27 = matched.v27;
+    } else if (state.comparativeData && state.comparativeData.centros && state.comparativeData.centros[fCenter]) {
+      total26 = state.comparativeData.centros[fCenter]['26'] || 0;
+      total27 = state.comparativeData.centros[fCenter]['27'] || 0;
+    }
+  }
+
+  const deltaTotal = total27 - total26;
   const anual26 = total26 * valIndexado * 12;
   const anual27 = total27 * valIndexado * 12;
   const incAnual = deltaTotal * valIndexado * 12;
@@ -2885,51 +3252,110 @@ function updateSimuladorCalculations() {
   const elPres26 = document.getElementById('sim-presupuesto-2026');
   if (elPres26) elPres26.textContent = `$${formatNum(anual26)} CLP`;
 
+  const elSub26 = document.getElementById('sim-subtext-2026');
+  if (elSub26) {
+    elSub26.textContent = isFilteredCenter
+      ? `Basado en ${formatNum(total26)} validados (${getShortCenterName(fCenter)})`
+      : `Basado en ${formatNum(total26)} validados (Comunal)`;
+  }
+
   const elPres27 = document.getElementById('sim-presupuesto-2027');
   if (elPres27) elPres27.textContent = `$${formatNum(anual27)} CLP`;
 
+  const elSub27 = document.getElementById('sim-subtext-2027');
+  if (elSub27) {
+    elSub27.textContent = isFilteredCenter
+      ? `Basado en ${formatNum(total27)} validados (${getShortCenterName(fCenter)})`
+      : `Basado en ${formatNum(total27)} validados (Comunal)`;
+  }
+
   const elIncNeto = document.getElementById('sim-incremento-neto');
-  if (elIncNeto) elIncNeto.textContent = `+$${formatNum(incAnual)} CLP / año`;
+  if (elIncNeto) {
+    const sign = incAnual >= 0 ? '+' : '';
+    elIncNeto.textContent = `${sign}$${formatNum(incAnual)} CLP / año`;
+  }
 
   const elIncMensual = document.getElementById('sim-incremento-mensual');
-  if (elIncMensual) elIncMensual.textContent = `+$${formatNum(incMensual)}/mes`;
+  if (elIncMensual) {
+    const sign = incMensual >= 0 ? '+' : '';
+    elIncMensual.textContent = `${sign}$${formatNum(incMensual)}/mes`;
+  }
+
+  const elBannerTitle = document.getElementById('sim-banner-title');
+  if (elBannerTitle) {
+    elBannerTitle.textContent = isFilteredCenter
+      ? `Incremento Presupuestario Neto para ${getShortCenterName(fCenter)}`
+      : 'Incremento Presupuestario Neto para Lampa';
+  }
+
+  const elBannerDesc = document.getElementById('sim-banner-desc');
+  if (elBannerDesc) {
+    const sign = deltaTotal >= 0 ? '+' : '';
+    elBannerDesc.innerHTML = isFilteredCenter
+      ? `Fondos adicionales generados por los <strong>${sign}${formatNum(deltaTotal)} nuevos inscritos validados</strong> en ${getShortCenterName(fCenter)}.`
+      : `Fondos adicionales generados por los <strong>+${formatNum(deltaTotal)} nuevos inscritos validados</strong> en el proceso 2027.`;
+  }
 
   const tbody = document.getElementById('table-sim-centros-body');
   if (!tbody) return;
 
-  const centers = [
-    { name: 'CESFAM José Bauza Frau', v26: 47336, v27: 48948 },
-    { name: 'CESFAM Batuco', v26: 16853, v27: 17130 },
-    { name: 'PSR Juan Pablo II de Lampa', v26: 10803, v27: 11314 },
-    { name: 'CECOSF Sol de Septiembre', v26: 6962, v27: 7564 },
-    { name: 'CECOSF Batuco', v26: 7082, v27: 7307 }
-  ];
+  let rowsHtml = '';
 
-  const rowsHtml = centers.map(c => {
-    const mPres = c.v27 * valIndexado;
-    const aPres = mPres * 12;
-    const dVal = c.v27 - c.v26;
-    const dAnual = dVal * valIndexado * 12;
+  if (isFilteredCenter && state.comparativeData && state.comparativeData.sectores && Object.keys(state.comparativeData.sectores).length > 0) {
+    const secEntries = Object.entries(state.comparativeData.sectores).sort((a, b) => (b[1]['27'] || 0) - (a[1]['27'] || 0));
+    rowsHtml = secEntries.map(([sName, data]) => {
+      const v26 = data['26'] || 0;
+      const v27 = data['27'] || 0;
+      const mPres = v27 * valIndexado;
+      const aPres = mPres * 12;
+      const dVal = v27 - v26;
+      const dAnual = dVal * valIndexado * 12;
+      const dSign = dAnual >= 0 ? '+' : '';
+      const label = sName === 'Sin Datos' ? 'Sin Datos / Comunal' : `Sector ${sName}`;
 
-    return `
-      <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
-        <td class="px-3.5 py-2.5 font-semibold text-slate-800 dark:text-slate-200">${c.name}</td>
-        <td class="px-3.5 py-2.5 text-right font-mono font-bold text-slate-900 dark:text-white">${formatNum(c.v27)}</td>
-        <td class="px-3.5 py-2.5 text-right font-mono text-slate-600 dark:text-slate-300">$${formatNum(mPres)}</td>
-        <td class="px-3.5 py-2.5 text-right font-mono font-bold text-blue-600 dark:text-blue-400">$${formatNum(aPres)}</td>
-        <td class="px-3.5 py-2.5 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">+$${formatNum(dAnual)}</td>
-      </tr>
-    `;
-  }).join('');
+      return `
+        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+          <td class="px-3.5 py-2.5 font-semibold text-slate-800 dark:text-slate-200">${label}</td>
+          <td class="px-3.5 py-2.5 text-right font-mono font-bold text-slate-900 dark:text-white">${formatNum(v27)}</td>
+          <td class="px-3.5 py-2.5 text-right font-mono text-slate-600 dark:text-slate-300">$${formatNum(mPres)}</td>
+          <td class="px-3.5 py-2.5 text-right font-mono font-bold text-blue-600 dark:text-blue-400">$${formatNum(aPres)}</td>
+          <td class="px-3.5 py-2.5 text-right font-mono font-bold ${dVal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600'}">${dSign}$${formatNum(dAnual)}</td>
+        </tr>
+      `;
+    }).join('');
+  } else {
+    rowsHtml = centers.map(c => {
+      const mPres = c.v27 * valIndexado;
+      const aPres = mPres * 12;
+      const dVal = c.v27 - c.v26;
+      const dAnual = dVal * valIndexado * 12;
+      const dSign = dAnual >= 0 ? '+' : '';
+
+      return `
+        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+          <td class="px-3.5 py-2.5 font-semibold text-slate-800 dark:text-slate-200">${c.name}</td>
+          <td class="px-3.5 py-2.5 text-right font-mono font-bold text-slate-900 dark:text-white">${formatNum(c.v27)}</td>
+          <td class="px-3.5 py-2.5 text-right font-mono text-slate-600 dark:text-slate-300">$${formatNum(mPres)}</td>
+          <td class="px-3.5 py-2.5 text-right font-mono font-bold text-blue-600 dark:text-blue-400">$${formatNum(aPres)}</td>
+          <td class="px-3.5 py-2.5 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">${dSign}$${formatNum(dAnual)}</td>
+        </tr>
+      `;
+    }).join('');
+  }
 
   const totalMensual27 = total27 * valIndexado;
+  const footerLabel = isFilteredCenter
+    ? `TOTAL ${getShortCenterName(fCenter).toUpperCase()}`
+    : 'TOTAL COMUNAL LAMPA';
+  const incSign = incAnual >= 0 ? '+' : '';
+
   const footerHtml = `
     <tr class="bg-slate-100/90 dark:bg-slate-800/90 font-extrabold text-slate-900 dark:text-white border-t-2 border-slate-300 dark:border-slate-700">
-      <td class="px-3.5 py-3 uppercase">Total Comunal Lampa</td>
+      <td class="px-3.5 py-3 uppercase">${footerLabel}</td>
       <td class="px-3.5 py-3 text-right font-mono">${formatNum(total27)}</td>
       <td class="px-3.5 py-3 text-right font-mono text-slate-700 dark:text-slate-200">$${formatNum(totalMensual27)}</td>
       <td class="px-3.5 py-3 text-right font-mono text-blue-600 dark:text-blue-400">$${formatNum(anual27)}</td>
-      <td class="px-3.5 py-3 text-right font-mono text-emerald-600 dark:text-emerald-400">+$${formatNum(incAnual)}</td>
+      <td class="px-3.5 py-3 text-right font-mono text-emerald-600 dark:text-emerald-400">${incSign}$${formatNum(incAnual)}</td>
     </tr>
   `;
 
@@ -2998,9 +3424,11 @@ function updateCohortActiveBanner(matchCount) {
 }
 
 function updateCohortButtonCounts() {
-  if (!state.cachedCohortCounts) return;
-  const yr = state.filters.year || '2027';
-  const counts = state.cachedCohortCounts[yr] || state.cachedCohortCounts['2027'];
+  if (!state.cachedCohortCountsByCenter) return;
+  const cKey = (state.filters && state.filters.center !== 'ALL') ? state.filters.center : 'ALL';
+  const yr = (state.filters && state.filters.year) || '2027';
+  const centerCounts = state.cachedCohortCountsByCenter[cKey] || state.cachedCohortCountsByCenter['ALL'];
+  const counts = centerCounts ? (centerCounts[yr] || centerCounts['2027']) : null;
   if (!counts) return;
 
   document.querySelectorAll('.cohort-btn').forEach(btn => {
@@ -3195,7 +3623,19 @@ function renderVulnerabilityIndexSection() {
 
   results.sort((a, b) => b.score - a.score);
 
-  container.innerHTML = results.map((r, idx) => {
+  results.forEach((r, idx) => {
+    r.communalRank = idx + 1;
+  });
+
+  const isFilteredCenter = state.filters && state.filters.center !== 'ALL';
+  if (isFilteredCenter) {
+    results = results.filter(r => r.fullName === state.filters.center);
+    container.className = 'grid grid-cols-1 max-w-md mx-auto gap-4';
+  } else {
+    container.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4';
+  }
+
+  container.innerHTML = results.map((r) => {
     const rankColors = [
       'bg-rose-500 text-white',
       'bg-amber-500 text-white',
@@ -3203,15 +3643,15 @@ function renderVulnerabilityIndexSection() {
       'bg-purple-600 text-white',
       'bg-slate-600 text-white'
     ];
-    const rankColor = rankColors[idx] || 'bg-slate-600 text-white';
+    const rankColor = rankColors[r.communalRank - 1] || 'bg-slate-600 text-white';
 
     return `
       <div class="bg-slate-50/70 dark:bg-slate-800/40 rounded-xl p-4 border border-slate-200/80 dark:border-slate-800 flex flex-col justify-between hover:border-blue-400 dark:hover:border-blue-500 transition-all hover:shadow-md group cursor-pointer" onclick="openFichaModalWithCenter('${r.fullName}')">
         <div>
           <!-- Header Card -->
           <div class="flex items-center justify-between mb-2">
-            <span class="w-6 h-6 rounded-full ${rankColor} text-[11px] font-mono font-bold flex items-center justify-center shadow-sm">
-              #${idx + 1}
+            <span class="w-6 h-6 rounded-full ${rankColor} text-[11px] font-mono font-bold flex items-center justify-center shadow-sm" title="Ranking Comunal">
+              #${r.communalRank}
             </span>
             <span class="px-2 py-0.5 rounded text-[10px] font-bold border ${r.priorityClass}">
               ${r.priorityBadge}
