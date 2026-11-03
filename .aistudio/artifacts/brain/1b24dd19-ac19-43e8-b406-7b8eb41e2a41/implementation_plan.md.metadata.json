@@ -1,0 +1,6 @@
+{
+  "summary": "Plan de implementación para recalcular los integrantes por Nº de Ficha permitiendo ver el corte anual y el total acumulado de la base de datos (resolviendo el caso de la ficha B 000702 con 21 integrantes).",
+  "updatedAt": "2026-10-16T13:58:06.943005301Z",
+  "requestFeedback": true,
+  "userFacing": true
+}

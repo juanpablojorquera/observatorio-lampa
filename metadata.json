@@ -1,0 +1,8 @@
+{
+  "name": "Observatorio de Población Validada FONASA 2026 - 2027",
+  "description": "Observatorio analítico interactivo de población validada FONASA (2026-2027) para la Red de Atención Primaria de Salud de la Comuna de Lampa.",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
