@@ -7,7 +7,7 @@ Dashboard analítico web interactivo de alto rendimiento desarrollado en **HTML5
 
 ## 🚀 Enlace de Datos en Vivo
 El dashboard se sincroniza automáticamente con la planilla oficial publicada en Google Sheets:
-* **URL Fuente:** `https://docs.google.com/spreadsheets/d/e/2PACX-1vQNvnBL8JmRnslsqopUX2KNx4uIgf887KyudrbCqwCXhCMyctxMH8phe0ZitiT2en6e4Rw5jSIySdVK/pub?gid=232444535&single=true&output=csv`
+* **URL Fuente:** `https://docs.google.com/spreadsheets/d/e/2PACX-1vQNvnBL8JmRnslsqopUX2KNx4uIgf887KyudrbCqwCXhCMyctxMH8phe0ZitiT2en6e4Rw5jSIySdVK/pub?gid=1673594557&single=true&output=csv`
 * **Registros totales procesados:** **181.299 registros individuales**
   - **Proceso 2026:** 89.036 validados (Corte 30/09/2025)
   - **Proceso 2027:** 92.263 validados (Corte 30/09/2026)
