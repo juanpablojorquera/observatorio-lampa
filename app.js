@@ -2881,6 +2881,7 @@ function buildFamiliesFromRecords(rawList) {
       const members = [];
       members.push({
         num: 1,
+        numFicha: folio,
         rol: 'Jefe/a de Hogar',
         g: head.g,
         e: head.e,
@@ -2911,6 +2912,7 @@ function buildFamiliesFromRecords(rawList) {
         const p = adults.pop();
         members.push({
           num: members.length + 1,
+          numFicha: folio,
           rol: 'Cónyuge / Pareja',
           g: p.g,
           e: p.e,
@@ -2931,6 +2933,7 @@ function buildFamiliesFromRecords(rawList) {
         const m = minors.pop();
         members.push({
           num: members.length + 1,
+          numFicha: folio,
           rol: 'Hijo/a',
           g: m.g,
           e: m.e,
@@ -2951,6 +2954,7 @@ function buildFamiliesFromRecords(rawList) {
         const s = seniors.pop();
         members.push({
           num: members.length + 1,
+          numFicha: folio,
           rol: 'Adulto Mayor / Ascendiente',
           g: s.g,
           e: s.e,
@@ -2971,6 +2975,7 @@ function buildFamiliesFromRecords(rawList) {
         const a = adults.pop();
         members.push({
           num: members.length + 1,
+          numFicha: folio,
           rol: 'Familiar / Dependiente',
           g: a.g,
           e: a.e,
@@ -3019,6 +3024,7 @@ function buildFamiliesFromRecords(rawList) {
       const familyObj = {
         id: famId,
         folio: folio,
+        numFicha: folio,
         sector: sName,
         center: center,
         year: year,
@@ -3315,11 +3321,14 @@ function renderVisorFamiliasCards() {
               🏠
             </div>
             <div>
-              <div class="flex items-center space-x-2">
-                <span class="font-mono font-extrabold text-sm text-slate-900 dark:text-white">${f.id}</span>
-                <span class="font-mono text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 font-semibold">${f.folio}</span>
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/70 border border-blue-200 dark:border-blue-800 text-blue-900 dark:text-blue-200 flex items-center space-x-1.5 shadow-xs">
+                  <span class="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Nº de Ficha:</span>
+                  <span class="font-mono font-extrabold text-xs sm:text-sm text-slate-900 dark:text-white">${f.folio}</span>
+                </span>
+                <span class="font-mono text-[11px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 font-medium">ID: ${f.id}</span>
               </div>
-              <div class="text-[11px] text-slate-400 truncate max-w-sm">
+              <div class="text-[11px] text-slate-400 truncate max-w-sm mt-0.5">
                 <span>${f.center}</span>
               </div>
             </div>
@@ -3347,6 +3356,7 @@ function renderVisorFamiliasCards() {
             <thead class="text-[10px] uppercase font-bold text-slate-400 bg-slate-50 dark:bg-slate-800/40">
               <tr>
                 <th class="px-2.5 py-1.5 w-6 text-center">#</th>
+                <th class="px-2.5 py-1.5 font-bold text-blue-700 dark:text-blue-300">Nº de Ficha</th>
                 <th class="px-2.5 py-1.5">Rol Familiar</th>
                 <th class="px-2.5 py-1.5">Género</th>
                 <th class="px-2.5 py-1.5">Edad</th>
@@ -3370,6 +3380,7 @@ function renderVisorFamiliasCards() {
                 return `
                   <tr class="hover:bg-slate-50/80 dark:hover:bg-slate-800/30">
                     <td class="px-2.5 py-2 text-center font-mono text-slate-400 font-bold">${m.num}</td>
+                    <td class="px-2.5 py-2 whitespace-nowrap font-mono font-bold text-blue-700 dark:text-blue-300 text-xs">${f.folio}</td>
                     <td class="px-2.5 py-2 whitespace-nowrap">${getRoleBadge(m.rol)}</td>
                     <td class="px-2.5 py-2 whitespace-nowrap font-medium">${genderLabel}</td>
                     <td class="px-2.5 py-2 whitespace-nowrap font-mono font-bold text-slate-900 dark:text-white">${m.e} <span class="font-normal text-slate-400 text-[10px]">años</span></td>
@@ -3439,6 +3450,7 @@ function exportDetailedFamiliesCSV() {
   // UTF-8 BOM for Excel compatibility
   let csvContent = '\uFEFF';
   const headers = [
+    'NUMERO_FICHA',
     'ID_FAMILIA',
     'FOLIO_FICHA_FAMILIAR',
     'SECTOR',
@@ -3469,6 +3481,7 @@ function exportDetailedFamiliesCSV() {
       totalMembersExported++;
 
       const row = [
+        `"${f.folio}"`,
         `"${f.id}"`,
         `"${f.folio}"`,
         `"${f.sector}"`,
