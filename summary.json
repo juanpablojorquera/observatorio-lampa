@@ -7,10 +7,10 @@
       "hombres": 42411,
       "intersex": 9,
       "tramos": {
-        "D": 18549,
-        "C": 13414,
         "A": 23066,
         "B": 29439,
+        "C": 13414,
+        "D": 18549,
         "X": 4568
       },
       "pyramid": {
@@ -97,13 +97,13 @@
       "sectors": {
         "Amarillo": 16193,
         "Verde": 6716,
-        "Sin Datos": 35475,
+        "Sin Datos": 35470,
         "Azul": 16597,
         "Sala Neurodiversa": 65,
         "Sector 1": 6707,
         "Sector 2": 7276,
         "Lila": 2,
-        "CECOSF": 5
+        "Sector B": 10
       },
       "migrantes": 8934,
       "discapacidad": 1283,
@@ -157,9 +157,9 @@
         "Trinidad Y Tobago": 2
       },
       "etnias": {
-        "No tiene": 65296,
+        "No tiene": 68912,
         "Otro (Especificar)": 10175,
-        "Sin Datos": 11551,
+        "Sin Datos": 7935,
         "Mapuche": 1001,
         "No responde": 159,
         "Chango": 209,
@@ -170,8 +170,8 @@
         "Lickanantay": 82,
         "Aymara": 40,
         "No sabe": 18,
-        "Yagᮼ/td>": 104,
-        "Kaw鳱ar": 35,
+        "Yagán": 104,
+        "Kawésqar": 35,
         "Alacalufe": 2
       }
     },
@@ -181,10 +181,10 @@
       "hombres": 44025,
       "intersex": 9,
       "tramos": {
-        "D": 19123,
-        "B": 25220,
         "A": 31264,
+        "B": 25220,
         "C": 12402,
+        "D": 19123,
         "X": 4254
       },
       "pyramid": {
@@ -269,16 +269,17 @@
         "Centro Comunitario de Salud Familiar Sol de Septiembre": 7564
       },
       "sectors": {
-        "Sin Datos": 34615,
-        "Amarillo": 17574,
-        "Verde": 7159,
+        "Sector B": 6565,
+        "Sector A": 4129,
+        "Sin Datos": 24187,
         "Sector 2": 7666,
-        "Azul": 17932,
+        "Sector 1": 7242,
+        "Azul": 17928,
+        "Amarillo": 17320,
+        "Verde": 7153,
         "Sala Neurodiversa": 68,
         "Lila": 4,
-        "Sector 1": 7239,
-        "Rojo": 1,
-        "CECOSF": 5
+        "Rojo": 1
       },
       "migrantes": 10953,
       "discapacidad": 1328,
@@ -335,18 +336,18 @@
         "Filipinas": 1
       },
       "etnias": {
-        "No tiene": 70634,
+        "No tiene": 74240,
         "Otro (Especificar)": 10868,
-        "Sin Datos": 8542,
         "Chango": 217,
+        "Sin Datos": 4936,
         "Quechua": 160,
         "Lickanantay": 85,
         "Mapuche": 1115,
-        "Kaw鳱ar": 39,
+        "Kawésqar": 39,
         "Colla": 105,
         "Rapa Nui": 51,
         "No responde": 159,
-        "Yagᮼ/td>": 109,
+        "Yagán": 109,
         "Diaguita": 98,
         "Aymara": 46,
         "Alacalufe": 2,

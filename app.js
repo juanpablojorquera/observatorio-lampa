@@ -629,27 +629,60 @@ function updateAgeMultiSelectUI() {
   }
 }
 
+function cleanSectorName(rawSector) {
+  if (!rawSector) return 'Sin Datos';
+  const s = String(rawSector).trim();
+  if (
+    s === '0' ||
+    s === 'NI' ||
+    s === 'N/I' ||
+    s === '-' ||
+    s === 'Sin Datos' ||
+    s === 'null' ||
+    s === 'NULL' ||
+    s === '00B' ||
+    s === 'C' ||
+    s === '3' ||
+    s === 'CECOSF'
+  ) {
+    return 'Sin Datos';
+  }
+  if (/^\d+$/.test(s) && s !== '1' && s !== '2') {
+    return 'Sin Datos';
+  }
+  if (s === 'a' || s === 'A') return 'Sector A';
+  if (s === 'b' || s === 'B') return 'Sector B';
+  if (s === '1') return 'Sector 1';
+  if (s === '2') return 'Sector 2';
+  return s;
+}
+
 // Sector Dropdown updater
 function updateSectorFilterOptions() {
   const sectorSelect = document.getElementById('filter-sector');
+  if (!sectorSelect) return;
   const selectedCenter = state.filters.center;
   
   const sectorsByCenter = {
-    'Centro de Salud Familiar  José Bauza Frau': ['Azul', 'Amarillo', 'Verde', 'CECOSF', 'Sin Datos'],
+    'Centro de Salud Familiar  José Bauza Frau': ['Azul', 'Amarillo', 'Verde', 'Sala Neurodiversa', 'Sin Datos'],
     'Centro de Salud Familiar Batuco': ['Sector 1', 'Sector 2', 'Sin Datos'],
-    'Posta de Salud Rural Juan Pablo II de Lampa': ['Amarillo', 'Sin Datos'],
-    'Centro Comunitario de Salud Familiar Sol de Septiembre': ['Sala Neurodiversa', 'Sin Datos'],
+    'Posta de Salud Rural Juan Pablo II de Lampa': ['Sector A', 'Sector B', 'Amarillo', 'Sin Datos'],
+    'Centro Comunitario de Salud Familiar Sol de Septiembre': ['Sin Datos'],
     'Centro Comunitario de Salud Familiar Batuco': ['Sin Datos']
   };
 
-  const defaultOptions = ['ALL', 'Azul', 'Amarillo', 'Verde', 'Sector 1', 'Sector 2', 'Sala Neurodiversa', 'CECOSF', 'Sin Datos'];
+  const defaultOptions = ['ALL', 'Azul', 'Amarillo', 'Verde', 'Sector 1', 'Sector 2', 'Sector A', 'Sector B', 'Sala Neurodiversa', 'Sin Datos'];
   const availableSectors = (selectedCenter !== 'ALL' && sectorsByCenter[selectedCenter]) 
     ? ['ALL', ...sectorsByCenter[selectedCenter]] 
     : defaultOptions;
 
   const currentVal = sectorSelect.value;
   sectorSelect.innerHTML = availableSectors.map(sec => {
-    const label = sec === 'ALL' ? 'Todos los Sectores' : (sec === 'Sin Datos' ? 'Sin Datos / Comunal' : `Sector ${sec}`);
+    let label = sec;
+    if (sec === 'ALL') label = 'Todos los Sectores';
+    else if (sec === 'Sin Datos') label = 'Sin Datos / Por Asignar';
+    else if (sec.startsWith('Sector ')) label = sec;
+    else label = `Sector ${sec}`;
     return `<option value="${sec}">${label}</option>`;
   }).join('');
 
@@ -768,7 +801,7 @@ function unpackCompactData(data, sourceName) {
       cleanData[i] = {
         y: String(r[0]),
         c: centers[r[1]],
-        s: sectors[r[2]],
+        s: cleanSectorName(sectors[r[2]]),
         g: r[3] === 1 ? 'MUJER' : (r[3] === 0 ? 'HOMBRE' : 'INTERSEX'),
         e: r[4],
         t: r[5],
@@ -1134,11 +1167,16 @@ function processParsedRecords(rows, sourceName) {
     const cuid = r['CUIDADOR'];
     const prais = r['PRAIS'];
 
-    // Etnia cleanup (fixing Yagᮼ/td> encoding artifact from Sheets)
+    // Etnia cleanup (fixing Yagᮼ/td> encoding artifact from Sheets and Kawésqar)
     const rawEt = (r['ETNIA'] || 'No tiene').trim();
     let cleanEt = rawEt;
-    if (cleanEt.startsWith('Yag')) cleanEt = 'Yagán';
-    if (cleanEt.startsWith('Kaw')) cleanEt = 'Kawésqar';
+    if (cleanEt === '0' || cleanEt === '') cleanEt = 'No tiene';
+    else if (cleanEt.startsWith('Yag')) cleanEt = 'Yagán';
+    else if (cleanEt.startsWith('Kaw')) cleanEt = 'Kawésqar';
+
+    // Nacionalidad cleanup
+    let cleanNat = (r['NACIONALIDAD'] || 'Sin Datos').trim();
+    if (cleanNat === '0' || cleanNat === '') cleanNat = 'Sin Datos';
 
     // Extract exact Column M Ficha value
     const fichaVal = extractFichaFromRawRow(r);
@@ -1151,11 +1189,11 @@ function processParsedRecords(rows, sourceName) {
     const item = {
       y: year,
       c: (r['NOMBRE_CENTRO'] || '').trim(),
-      s: (r['SECTOR'] || 'Sin Datos').trim(),
+      s: cleanSectorName(r['SECTOR']),
       g: (r['GENERO'] || 'SIN DATOS').trim().toUpperCase(),
       e: parseInt(r['EDAD (años)'], 10) || 0,
       t: (r['TRAMO'] || 'X').trim().toUpperCase(),
-      n: (r['NACIONALIDAD'] || 'Sin Datos').trim(),
+      n: cleanNat,
       et: cleanEt,
       p: isPrais,
       d: isDisc,
@@ -1658,7 +1696,7 @@ function renderComparativeTable(agg) {
       const diffPct = val26 > 0 ? ((diff / val26) * 100).toFixed(1) : '0.0';
       const isPositive = diff >= 0;
       const share27 = total2027 > 0 ? ((val27 / total2027) * 100).toFixed(1) : '0.0';
-      const label = sName === 'Sin Datos' ? 'Sin Datos / Comunal' : `Sector ${sName}`;
+      const label = sName === 'Sin Datos' ? 'Sin Datos / Comunal' : (sName.startsWith('Sector ') ? sName : `Sector ${sName}`);
 
       return `
         <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
@@ -2381,7 +2419,7 @@ function renderTramosDetailTable(agg) {
       totalComuna += secTot;
       totA += tc.A; totB += tc.B; totC += tc.C; totD += tc.D; totX += tc.X;
 
-      const label = sName === 'Sin Datos' ? 'Sin Datos / Comunal' : `Sector ${sName}`;
+      const label = sName === 'Sin Datos' ? 'Sin Datos / Comunal' : (sName.startsWith('Sector ') ? sName : `Sector ${sName}`);
 
       return `
         <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
@@ -2673,7 +2711,7 @@ function renderInclusionDetailTable(agg) {
       totDis += s.discapacidad;
       totCui += s.cuidadores;
 
-      const label = sName === 'Sin Datos' ? 'Sin Datos / Comunal' : `Sector ${sName}`;
+      const label = sName === 'Sin Datos' ? 'Sin Datos / Comunal' : (sName.startsWith('Sector ') ? sName : `Sector ${sName}`);
 
       return `
         <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
@@ -2900,6 +2938,12 @@ function formatDefaultChileanFicha(sectorName, famNum) {
   if (s.includes('sector 2') || s.includes('sector2')) {
     return `S02/${famNum}`;
   }
+  if (s.includes('sector a') || s === 'a') {
+    return `A ${String(famNum).padStart(6, '0')}`;
+  }
+  if (s.includes('sector b') || s === 'b') {
+    return `B ${String(famNum).padStart(6, '0')}`;
+  }
   if (s.includes('amarillo')) {
     return `S-AMA/${famNum}`;
   }
@@ -2915,19 +2959,54 @@ function formatDefaultChileanFicha(sectorName, famNum) {
   if (s.includes('lila')) {
     return `S-LIL/${famNum}`;
   }
-  if (s.includes('cecosf')) {
-    return `CECOSF/${famNum}`;
-  }
   if (s.includes('sala')) {
     return `S-NEU/${famNum}`;
   }
   return `S/F-Sin Datos-${famNum}`;
 }
 
+function isValidSharedFicha(fVal) {
+  if (!fVal) return false;
+  const clean = fVal.trim().toUpperCase();
+  if (
+    clean === '0' ||
+    clean === 'SIN DATOS' ||
+    clean === 'NI' ||
+    clean === 'N/I' ||
+    clean === 'NO' ||
+    clean === 'NULL' ||
+    clean === 'NONE' ||
+    clean === '-' ||
+    clean === 'S/F' ||
+    clean === 'S/D' ||
+    clean === 'SD'
+  ) {
+    return false;
+  }
+  if (clean.startsWith('S/F')) return false;
+  if (
+    clean.includes('BLOQUEA') ||
+    clean.includes('SIN PREVISION') ||
+    clean.includes('CAMBIO DE RUT') ||
+    clean.includes('ACTUALIZAR') ||
+    clean.includes('TELEF') ||
+    clean.includes('CONTACT')
+  ) {
+    return false;
+  }
+  return true;
+}
+
 function buildFamiliesFromRecords(rawList) {
   let list = rawList;
   if (!list || list.length === 0) {
     list = (state.filteredData && state.filteredData.length > 0) ? state.filteredData : (state.rawData || []);
+  }
+
+  // If year is ALL, default to official active cohort 2027 to prevent duplicate same-person records across cohorts
+  if (state.filters && state.filters.year === 'ALL' && list && list.length > 0) {
+    const list2027 = list.filter(item => item.y === '2027');
+    if (list2027.length > 0) list = list2027;
   }
 
   if (!list || list.length === 0) {
@@ -3047,7 +3126,7 @@ function buildFamiliesFromRecords(rawList) {
     const fichaCounts = new Map();
     for (let i = 0; i < sItems.length; i++) {
       const fVal = (sItems[i].ficha || '').trim();
-      if (fVal && !fVal.toUpperCase().startsWith('S/F')) {
+      if (isValidSharedFicha(fVal)) {
         fichaCounts.set(fVal, (fichaCounts.get(fVal) || 0) + 1);
       }
     }
@@ -3055,7 +3134,9 @@ function buildFamiliesFromRecords(rawList) {
     for (let i = 0; i < sItems.length; i++) {
       const it = sItems[i];
       const fVal = (it.ficha || '').trim();
-      if (fVal && !fVal.toUpperCase().startsWith('S/F') && fichaCounts.get(fVal) > 1) {
+      const count = fichaCounts.get(fVal) || 0;
+      // Real family: shared by 2 to 10 persons, not an administrative dummy code
+      if (isValidSharedFicha(fVal) && count > 1 && count <= 10) {
         if (!sharedFichaMap.has(fVal)) {
           sharedFichaMap.set(fVal, []);
         }
@@ -4405,7 +4486,7 @@ function updateSimuladorCalculations() {
       const dVal = v27 - v26;
       const dAnual = dVal * valIndexado * 12;
       const dSign = dAnual >= 0 ? '+' : '';
-      const label = sName === 'Sin Datos' ? 'Sin Datos / Comunal' : `Sector ${sName}`;
+      const label = sName === 'Sin Datos' ? 'Sin Datos / Comunal' : (sName.startsWith('Sector ') ? sName : `Sector ${sName}`);
 
       return `
         <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
