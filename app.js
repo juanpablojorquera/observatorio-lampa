@@ -685,6 +685,24 @@ async function loadData(forceRefresh = false) {
   // 1. If compact offline data is available and not forcing remote refresh, unpack synchronously (zero delay, zero CORS)
   if (!forceRefresh && typeof window !== 'undefined' && window.OFFLINE_COMPACT_DATA) {
     unpackCompactData(window.OFFLINE_COMPACT_DATA, 'Base Oficial Validada (Local)');
+    // Background sync: attempt to load official Google Sheets to sync live Column M (Nº de Ficha)
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
+      setTimeout(() => {
+        fetch(GOOGLE_SHEETS_CSV_URL)
+          .then(res => {
+            if (res.ok) return res.text();
+            throw new Error(`HTTP ${res.status}`);
+          })
+          .then(text => {
+            if (text && text.length > 5000) {
+              parseCSVText(text, 'Google Sheets (En Vivo)');
+            }
+          })
+          .catch(err => {
+            console.log('Background Google Sheets sync skipped (using offline data):', err.message);
+          });
+      }, 500);
+    }
     return;
   }
 
@@ -750,12 +768,14 @@ function unpackCompactData(data, sourceName) {
         et: etnias[r[7]],
         p: r[8] === 1,
         d: r[9] === 1,
-        cd: r[10] === 1
+        cd: r[10] === 1,
+        ficha: r[11] ? String(r[11]).trim() : ''
       };
     }
 
     state.rawData = cleanData;
     state.dataSourceName = sourceName;
+    state.familiasData = null;
     updateStatusPill(sourceName, 'online', cleanData.length);
     precalculateCache(cleanData);
     renderComparativaModule();
@@ -1019,6 +1039,74 @@ function parseCSVFile(file) {
   });
 }
 
+// Robust extraction of Nº de Ficha from Column M (13th column) or named header
+function extractFichaFromRawRow(r) {
+  if (!r) return '';
+
+  // 1. Direct standard names check
+  const directHeaders = [
+    'Nº DE FICHA',
+    'N° DE FICHA',
+    'Nº FICHA',
+    'N° FICHA',
+    'NUMERO_FICHA',
+    'NUMERO DE FICHA',
+    'NUMERO FICHA',
+    'N_FICHA',
+    'FICHA_FAMILIAR',
+    'FICHA FAMILIAR',
+    'FICHA',
+    'FOLIO'
+  ];
+  for (let i = 0; i < directHeaders.length; i++) {
+    const h = directHeaders[i];
+    if (r[h] !== undefined && r[h] !== null) {
+      const v = String(r[h]).trim();
+      if (v.length > 0) return v;
+    }
+  }
+
+  // 2. Scan all object keys matching 'ficha' (case-insensitive, removing BOM/spaces)
+  const keys = Object.keys(r);
+  for (let k = 0; k < keys.length; k++) {
+    const rawKey = keys[k];
+    const cleanKey = rawKey.trim().toUpperCase().replace(/[\uFEFF\u0000\r\n]/g, '');
+    if (
+      cleanKey === 'Nº DE FICHA' ||
+      cleanKey === 'N° DE FICHA' ||
+      cleanKey === 'Nº FICHA' ||
+      cleanKey === 'N° FICHA' ||
+      cleanKey === 'NUMERO_FICHA' ||
+      cleanKey === 'NUMERO DE FICHA' ||
+      cleanKey === 'NUMERO FICHA' ||
+      cleanKey === 'N_FICHA' ||
+      cleanKey === 'FICHA_FAMILIAR' ||
+      cleanKey === 'FICHA FAMILIAR' ||
+      cleanKey === 'FICHA' ||
+      cleanKey === 'FOLIO' ||
+      cleanKey.includes('FICHA')
+    ) {
+      const v = r[rawKey];
+      if (v !== undefined && v !== null) {
+        const val = String(v).trim();
+        if (val.length > 0) return val;
+      }
+    }
+  }
+
+  // 3. Positional check: Column M is the 13th column (index 12 in 0-indexed A-M)
+  if (keys.length >= 13) {
+    const colMKey = keys[12];
+    const v = r[colMKey];
+    if (v !== undefined && v !== null) {
+      const val = String(v).trim();
+      if (val.length > 0) return val;
+    }
+  }
+
+  return '';
+}
+
 // Compact records into ultra-lightweight structures
 function processParsedRecords(rows, sourceName) {
   showLoading('Optimizando Datos', 'Construyendo índices analíticos...', 85);
@@ -1042,6 +1130,9 @@ function processParsedRecords(rows, sourceName) {
     const rawEt = (r['ETNIA'] || 'No tiene').trim();
     const cleanEt = rawEt.startsWith('Yag') ? 'Yagán' : rawEt;
 
+    // Extract exact Column M Ficha value
+    const fichaVal = extractFichaFromRawRow(r);
+
     // Compact item representation
     const item = {
       y: year,
@@ -1054,7 +1145,8 @@ function processParsedRecords(rows, sourceName) {
       et: cleanEt,
       p: prais === 'SI' || prais === 'Si',
       d: Boolean(disc && disc.trim().length > 0),
-      cd: Boolean(cuid && cuid.trim().length > 0)
+      cd: Boolean(cuid && cuid.trim().length > 0),
+      ficha: fichaVal
     };
     
     cleanData.push(item);
@@ -1062,6 +1154,7 @@ function processParsedRecords(rows, sourceName) {
 
   state.rawData = cleanData;
   state.dataSourceName = sourceName;
+  state.familiasData = null;
   updateStatusPill(sourceName, 'online', cleanData.length);
 
   // Pre-calculate cached cohort counts and vulnerability summaries
@@ -2785,6 +2878,38 @@ function getCicloVital(age) {
   return 'Persona Mayor (65+)';
 }
 
+function formatDefaultChileanFicha(sectorName, famNum) {
+  const s = (sectorName || '').trim().toLowerCase();
+  if (s.includes('sector 1') || s.includes('sector1')) {
+    return `S01/${famNum}`;
+  }
+  if (s.includes('sector 2') || s.includes('sector2')) {
+    return `S02/${famNum}`;
+  }
+  if (s.includes('amarillo')) {
+    return `S-AMA/${famNum}`;
+  }
+  if (s.includes('verde')) {
+    return `S-VER/${famNum}`;
+  }
+  if (s.includes('azul')) {
+    return `S-AZU/${famNum}`;
+  }
+  if (s.includes('rojo')) {
+    return `S-ROJ/${famNum}`;
+  }
+  if (s.includes('lila')) {
+    return `S-LIL/${famNum}`;
+  }
+  if (s.includes('cecosf')) {
+    return `CECOSF/${famNum}`;
+  }
+  if (s.includes('sala')) {
+    return `S-NEU/${famNum}`;
+  }
+  return `S/F-Sin Datos-${famNum}`;
+}
+
 function buildFamiliesFromRecords(rawList) {
   let list = rawList;
   if (!list || list.length === 0) {
@@ -2848,17 +2973,6 @@ function buildFamiliesFromRecords(rawList) {
       }
     }
 
-    const seniors = [];
-    const adults = [];
-    const minors = [];
-
-    for (let i = 0; i < sItems.length; i++) {
-      const it = sItems[i];
-      if (it.e >= 65) seniors.push(it);
-      else if (it.e >= 18) adults.push(it);
-      else minors.push(it);
-    }
-
     let famNum = 1;
     const cleanSlug = sName.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5) || 'SEC';
     const sectorFamilies = [];
@@ -2871,17 +2985,168 @@ function buildFamiliesFromRecords(rawList) {
     let secInfancia = 0;
     let secTramoA = 0;
 
+    const registerFamily = (familyObj) => {
+      const mCount = familyObj.membersCount;
+      if (mCount === 1) {
+        secUnipersonales++;
+      } else if (mCount <= 3) {
+        secPequenas++;
+      } else if (mCount <= 5) {
+        secMedianas++;
+      } else {
+        secNumerosas++;
+      }
+
+      if (familyObj.hasSenior) secMayores++;
+      if (familyObj.hasInfancia) secInfancia++;
+      if (familyObj.hasTramoA) secTramoA++;
+
+      sectorFamilies.push(familyObj);
+      allFamilies.push(familyObj);
+      famNum++;
+    };
+
+    const categorizeHousehold = (members) => {
+      const mCount = members.length;
+      const hasChildren = members.some(m => m.e < 18);
+      const hasSenior = members.some(m => m.e >= 65);
+
+      if (mCount === 1) {
+        return members[0].e >= 65 ? 'Adulto Mayor Solo' : 'Unipersonal';
+      } else if (mCount <= 3) {
+        if (hasChildren) return 'Monoparental con Hijo';
+        if (hasSenior) return 'Pareja Adultos Mayores';
+        return 'Nuclear sin Hijos';
+      } else if (mCount <= 5) {
+        if (hasSenior && hasChildren) return 'Extendida Multigeneracional';
+        if (hasChildren) return 'Nuclear con Hijos';
+        return 'Hogar Adulto Compartido';
+      } else {
+        return 'Familia Numerosa (6+)';
+      }
+    };
+
+    // 2. Identify shared Fichas from Column M (APS Fichas Familiares shared across multiple family members)
+    const sharedFichaMap = new Map();
+    const individualItems = [];
+
+    const fichaCounts = new Map();
+    for (let i = 0; i < sItems.length; i++) {
+      const fVal = (sItems[i].ficha || '').trim();
+      if (fVal && !fVal.toUpperCase().startsWith('S/F')) {
+        fichaCounts.set(fVal, (fichaCounts.get(fVal) || 0) + 1);
+      }
+    }
+
+    for (let i = 0; i < sItems.length; i++) {
+      const it = sItems[i];
+      const fVal = (it.ficha || '').trim();
+      if (fVal && !fVal.toUpperCase().startsWith('S/F') && fichaCounts.get(fVal) > 1) {
+        if (!sharedFichaMap.has(fVal)) {
+          sharedFichaMap.set(fVal, []);
+        }
+        sharedFichaMap.get(fVal).push(it);
+      } else {
+        individualItems.push(it);
+      }
+    }
+
+    // A. Build families for individuals that share a real Ficha Familiar in Column M
+    sharedFichaMap.forEach((fMembers, fVal) => {
+      // Sort members descending by age: oldest first
+      fMembers.sort((a, b) => b.e - a.e);
+      const head = fMembers[0];
+      const year = head.y || (state.filters ? state.filters.year : '2027');
+      const famId = `FAM-${cleanSlug}-${String(famNum).padStart(5, '0')}`;
+      const folio = fVal; // Preserve exact Column M string
+      const center = head.c || bestCenter;
+
+      const members = [];
+      for (let mIdx = 0; mIdx < fMembers.length; mIdx++) {
+        const mem = fMembers[mIdx];
+        let rol = 'Familiar / Dependiente';
+        if (mIdx === 0) {
+          rol = 'Jefe/a de Hogar';
+        } else if (mIdx === 1 && mem.e >= 18 && head.e >= 18 && Math.abs(mem.e - head.e) <= 22) {
+          rol = 'Cónyuge / Pareja';
+        } else if (mem.e >= 65) {
+          rol = 'Adulto Mayor / Ascendiente';
+        } else if (mem.e < 18) {
+          rol = 'Hijo/a';
+        }
+
+        members.push({
+          num: mIdx + 1,
+          numFicha: mem.ficha || folio,
+          ficha: mem.ficha || folio,
+          rol: rol,
+          g: mem.g,
+          e: mem.e,
+          t: mem.t,
+          n: mem.n,
+          et: mem.et,
+          p: mem.p,
+          d: mem.d,
+          cd: mem.cd,
+          c: mem.c,
+          s: mem.s,
+          y: mem.y
+        });
+      }
+
+      const mCount = members.length;
+      const hasInfancia09 = members.some(m => m.e < 10);
+      const hasSenior = members.some(m => m.e >= 65);
+      const hasTramoA = members.some(m => m.t === 'A');
+      const category = categorizeHousehold(members);
+
+      const familyObj = {
+        id: famId,
+        folio: folio,
+        numFicha: folio,
+        sector: sName,
+        center: center,
+        year: year,
+        category: category,
+        membersCount: mCount,
+        hasSenior: hasSenior,
+        hasInfancia: hasInfancia09,
+        hasTramoA: hasTramoA,
+        members: members
+      };
+
+      registerFamily(familyObj);
+    });
+
+    // B. Build families for individual / ungrouped records
+    const seniors = [];
+    const adults = [];
+    const minors = [];
+
+    for (let i = 0; i < individualItems.length; i++) {
+      const it = individualItems[i];
+      if (it.e >= 65) seniors.push(it);
+      else if (it.e >= 18) adults.push(it);
+      else minors.push(it);
+    }
+
     while (adults.length > 0 || seniors.length > 0 || minors.length > 0) {
       const head = adults.pop() || seniors.pop() || minors.pop();
       const year = head.y || (state.filters ? state.filters.year : '2027');
       const famId = `FAM-${cleanSlug}-${String(famNum).padStart(5, '0')}`;
-      const folio = `FF-${year}-${cleanSlug}-${String(famNum).padStart(5, '0')}`;
+      
+      // Preserve exact Column M format or use authentic Chilean APS format
+      const folio = (head.ficha && head.ficha.trim().length > 0)
+        ? head.ficha.trim()
+        : formatDefaultChileanFicha(sName, famNum);
       const center = head.c || bestCenter;
 
       const members = [];
+      const headFicha = (head.ficha && head.ficha.trim().length > 0) ? head.ficha.trim() : folio;
       members.push({
         num: 1,
-        numFicha: folio,
+        numFicha: headFicha,
+        ficha: headFicha,
         rol: 'Jefe/a de Hogar',
         g: head.g,
         e: head.e,
@@ -2910,9 +3175,11 @@ function buildFamiliesFromRecords(rawList) {
       // Fill partner
       if (members.length < targetSize && adults.length > 0 && head.e >= 18) {
         const p = adults.pop();
+        const pFicha = (p.ficha && p.ficha.trim().length > 0) ? p.ficha.trim() : folio;
         members.push({
           num: members.length + 1,
-          numFicha: folio,
+          numFicha: pFicha,
+          ficha: pFicha,
           rol: 'Cónyuge / Pareja',
           g: p.g,
           e: p.e,
@@ -2931,9 +3198,11 @@ function buildFamiliesFromRecords(rawList) {
       // Fill minors/children
       while (members.length < targetSize && minors.length > 0) {
         const m = minors.pop();
+        const mFicha = (m.ficha && m.ficha.trim().length > 0) ? m.ficha.trim() : folio;
         members.push({
           num: members.length + 1,
-          numFicha: folio,
+          numFicha: mFicha,
+          ficha: mFicha,
           rol: 'Hijo/a',
           g: m.g,
           e: m.e,
@@ -2952,9 +3221,11 @@ function buildFamiliesFromRecords(rawList) {
       // Fill senior
       if (members.length < targetSize && seniors.length > 0) {
         const s = seniors.pop();
+        const sFicha = (s.ficha && s.ficha.trim().length > 0) ? s.ficha.trim() : folio;
         members.push({
           num: members.length + 1,
-          numFicha: folio,
+          numFicha: sFicha,
+          ficha: sFicha,
           rol: 'Adulto Mayor / Ascendiente',
           g: s.g,
           e: s.e,
@@ -2973,9 +3244,11 @@ function buildFamiliesFromRecords(rawList) {
       // Fill remaining adult if available
       while (members.length < targetSize && adults.length > 0) {
         const a = adults.pop();
+        const aFicha = (a.ficha && a.ficha.trim().length > 0) ? a.ficha.trim() : folio;
         members.push({
           num: members.length + 1,
-          numFicha: folio,
+          numFicha: aFicha,
+          ficha: aFicha,
           rol: 'Familiar / Dependiente',
           g: a.g,
           e: a.e,
@@ -2997,29 +3270,7 @@ function buildFamiliesFromRecords(rawList) {
       const hasInfancia09 = members.some(m => m.e < 10);
       const hasSenior = members.some(m => m.e >= 65);
       const hasTramoA = members.some(m => m.t === 'A');
-
-      let category = 'Unipersonal';
-      if (mCount === 1) {
-        category = members[0].e >= 65 ? 'Adulto Mayor Solo' : 'Unipersonal';
-        secUnipersonales++;
-      } else if (mCount <= 3) {
-        secPequenas++;
-        if (hasChildren) category = 'Monoparental con Hijo';
-        else if (hasSenior) category = 'Pareja Adultos Mayores';
-        else category = 'Nuclear sin Hijos';
-      } else if (mCount <= 5) {
-        secMedianas++;
-        if (hasSenior && hasChildren) category = 'Extendida Multigeneracional';
-        else if (hasChildren) category = 'Nuclear con Hijos';
-        else category = 'Hogar Adulto Compartido';
-      } else {
-        secNumerosas++;
-        category = 'Familia Numerosa (6+)';
-      }
-
-      if (hasSenior) secMayores++;
-      if (hasInfancia09) secInfancia++;
-      if (hasTramoA) secTramoA++;
+      const category = categorizeHousehold(members);
 
       const familyObj = {
         id: famId,
@@ -3036,9 +3287,7 @@ function buildFamiliesFromRecords(rawList) {
         members: members
       };
 
-      sectorFamilies.push(familyObj);
-      allFamilies.push(familyObj);
-      famNum++;
+      registerFamily(familyObj);
     }
 
     globalUnipersonales += secUnipersonales;
@@ -3232,6 +3481,8 @@ function renderVisorFamiliasCards() {
       const matchCat = f.category.toLowerCase().includes(searchFilter);
       const matchCenter = f.center.toLowerCase().includes(searchFilter);
       const matchMember = f.members.some(m =>
+        (m.numFicha && m.numFicha.toLowerCase().includes(searchFilter)) ||
+        (m.ficha && m.ficha.toLowerCase().includes(searchFilter)) ||
         (m.rol && m.rol.toLowerCase().includes(searchFilter)) ||
         (m.t && m.t.toLowerCase() === searchFilter) ||
         (m.n && m.n.toLowerCase().includes(searchFilter)) ||
@@ -3380,7 +3631,7 @@ function renderVisorFamiliasCards() {
                 return `
                   <tr class="hover:bg-slate-50/80 dark:hover:bg-slate-800/30">
                     <td class="px-2.5 py-2 text-center font-mono text-slate-400 font-bold">${m.num}</td>
-                    <td class="px-2.5 py-2 whitespace-nowrap font-mono font-bold text-blue-700 dark:text-blue-300 text-xs">${f.folio}</td>
+                    <td class="px-2.5 py-2 whitespace-nowrap font-mono font-bold text-blue-700 dark:text-blue-300 text-xs">${m.numFicha || f.folio}</td>
                     <td class="px-2.5 py-2 whitespace-nowrap">${getRoleBadge(m.rol)}</td>
                     <td class="px-2.5 py-2 whitespace-nowrap font-medium">${genderLabel}</td>
                     <td class="px-2.5 py-2 whitespace-nowrap font-mono font-bold text-slate-900 dark:text-white">${m.e} <span class="font-normal text-slate-400 text-[10px]">años</span></td>
@@ -3480,10 +3731,13 @@ function exportDetailedFamiliesCSV() {
       const m = members[j];
       totalMembersExported++;
 
+      const numFicha = (m.numFicha || m.ficha || f.numFicha || f.folio || '').trim();
+      const folioFamiliar = (f.folio || f.numFicha || numFicha || '').trim();
+
       const row = [
-        `"${f.folio}"`,
+        `"${numFicha}"`,
         `"${f.id}"`,
-        `"${f.folio}"`,
+        `"${folioFamiliar}"`,
         `"${f.sector}"`,
         `"${f.center}"`,
         f.year,
