@@ -4,7 +4,7 @@
  * High-Performance Client-Side Analytics Engine
  */
 
-const GOOGLE_SHEETS_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQNvnBL8JmRnslsqopUX2KNx4uIgf887KyudrbCqwCXhCMyctxMH8phe0ZitiT2en6e4Rw5jSIySdVK/pub?gid=232444535&single=true&output=csv';
+const GOOGLE_SHEETS_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQNvnBL8JmRnslsqopUX2KNx4uIgf887KyudrbCqwCXhCMyctxMH8phe0ZitiT2en6e4Rw5jSIySdVK/pub?gid=1673594557&single=true&output=csv';
 const LOCAL_CSV_FALLBACK = 'data.csv';
 
 // Global State
@@ -751,12 +751,20 @@ function unpackCompactData(data, sourceName) {
     const sectors = data.s;
     const nations = data.n;
     const etnias = data.et;
+    const fichas = data.f || null;
     const raw = data.r;
     const len = raw.length;
     const cleanData = new Array(len);
 
     for (let i = 0; i < len; i++) {
       const r = raw[i];
+      let fichaStr = '';
+      if (fichas && r[11] !== undefined && r[11] !== null) {
+        fichaStr = typeof r[11] === 'number' ? (fichas[r[11]] || '') : String(r[11]);
+      } else if (r[11]) {
+        fichaStr = String(r[11]).trim();
+      }
+
       cleanData[i] = {
         y: String(r[0]),
         c: centers[r[1]],
@@ -769,7 +777,7 @@ function unpackCompactData(data, sourceName) {
         p: r[8] === 1,
         d: r[9] === 1,
         cd: r[10] === 1,
-        ficha: r[11] ? String(r[11]).trim() : ''
+        ficha: fichaStr
       };
     }
 
@@ -1122,16 +1130,22 @@ function processParsedRecords(rows, sourceName) {
     if (year !== '2026' && year !== '2027') continue;
 
     // Fast boolean flags without unnecessary string allocations
-    const disc = r['DISCAPACITADO'];
+    const disc = r['DISCAPACITADO'] || r['DISCAPACISIADO'];
     const cuid = r['CUIDADOR'];
     const prais = r['PRAIS'];
 
     // Etnia cleanup (fixing Yagᮼ/td> encoding artifact from Sheets)
     const rawEt = (r['ETNIA'] || 'No tiene').trim();
-    const cleanEt = rawEt.startsWith('Yag') ? 'Yagán' : rawEt;
+    let cleanEt = rawEt;
+    if (cleanEt.startsWith('Yag')) cleanEt = 'Yagán';
+    if (cleanEt.startsWith('Kaw')) cleanEt = 'Kawésqar';
 
     // Extract exact Column M Ficha value
     const fichaVal = extractFichaFromRawRow(r);
+
+    const isDisc = Boolean(disc && (disc.trim().toUpperCase() === 'SI' || disc.trim() === '1'));
+    const isCuid = Boolean(cuid && (cuid.trim().toUpperCase() === 'SI' || cuid.trim() === '1'));
+    const isPrais = Boolean(prais && (prais.trim().toUpperCase() === 'SI' || prais.trim() === '1'));
 
     // Compact item representation
     const item = {
@@ -1143,9 +1157,9 @@ function processParsedRecords(rows, sourceName) {
       t: (r['TRAMO'] || 'X').trim().toUpperCase(),
       n: (r['NACIONALIDAD'] || 'Sin Datos').trim(),
       et: cleanEt,
-      p: prais === 'SI' || prais === 'Si',
-      d: Boolean(disc && disc.trim().length > 0),
-      cd: Boolean(cuid && cuid.trim().length > 0),
+      p: isPrais,
+      d: isDisc,
+      cd: isCuid,
       ficha: fichaVal
     };
     
