@@ -46,8 +46,12 @@ const state = {
 
   // High-performance precomputed caches
   cachedCohortCounts: null,
+  cachedCohortCountsByCenter: null,
   cachedVulnerabilityStats: null,
   comparativeData: null,
+  familiasData: null,
+  familiasVisorFilter: { sector: 'ALL', search: '' },
+  familiasPagination: { page: 1, pageSize: 8, totalPages: 1 },
   currentAgg: null,
   currentTab: 'tab-resumen'
 };
@@ -1388,6 +1392,7 @@ function applyFilters() {
 
   state.filteredData = filtered;
   state.currentAgg = agg;
+  state.familiasData = null;
 
   // Update UI Elements
   updateKPIs(agg);
@@ -1711,6 +1716,8 @@ function renderActiveTab(tabId) {
       renderProgramasCentrosChart(agg);
       renderInclusionDetailTable(agg);
     }
+  } else if (tabId === 'tab-familias') {
+    renderFamiliasModule();
   } else if (tabId === 'tab-simulador') {
     updateSimuladorCalculations();
   } else if (tabId === 'tab-datos') {
@@ -2763,6 +2770,812 @@ function exportFilteredCSV() {
   document.body.removeChild(link);
   setTimeout(() => URL.revokeObjectURL(url), 2000);
   showToast(`Exportados ${formatNum(len)} registros a CSV con éxito`, '📥');
+}
+
+// ==========================================================
+// MÓDULO: FAMILIAS POR SECTOR Y FICHAS FAMILIARES (APS)
+// ==========================================================
+
+function getCicloVital(age) {
+  if (isNaN(age) || age === null || age === undefined) return 'Desconocido';
+  if (age < 10) return 'Infancia (0-9)';
+  if (age < 20) return 'Adolescencia (10-19)';
+  if (age < 40) return 'Adulto Joven (20-39)';
+  if (age < 65) return 'Adulto (40-64)';
+  return 'Persona Mayor (65+)';
+}
+
+function buildFamiliesFromRecords(rawList) {
+  let list = rawList;
+  if (!list || list.length === 0) {
+    list = (state.filteredData && state.filteredData.length > 0) ? state.filteredData : (state.rawData || []);
+  }
+
+  if (!list || list.length === 0) {
+    return {
+      families: [],
+      sectorsSummary: [],
+      totalFamilies: 0,
+      totalPersons: 0,
+      kpis: {
+        totalFamilies: 0,
+        totalPersons: 0,
+        promedio: 0,
+        unipersonales: 0,
+        infancia: 0,
+        mayores: 0,
+        tramoA: 0
+      }
+    };
+  }
+
+  // 1. Group records by Sector
+  const sectorGroups = {};
+  const sectorCenters = {};
+
+  for (let i = 0; i < list.length; i++) {
+    const item = list[i];
+    const s = item.s || 'Sin Datos';
+    if (!sectorGroups[s]) {
+      sectorGroups[s] = [];
+      sectorCenters[s] = {};
+    }
+    sectorGroups[s].push(item);
+    const cName = item.c || 'Comuna de Lampa';
+    sectorCenters[s][cName] = (sectorCenters[s][cName] || 0) + 1;
+  }
+
+  const allFamilies = [];
+  const sectorsSummary = [];
+
+  let globalUnipersonales = 0;
+  let globalInfancia = 0;
+  let globalMayores = 0;
+  let globalTramoA = 0;
+
+  // Process each sector
+  for (const sName in sectorGroups) {
+    const sItems = sectorGroups[sName];
+    // Find predominant center for this sector
+    let bestCenter = state.filters && state.filters.center !== 'ALL' ? state.filters.center : 'Comunal Lampa';
+    if (state.filters && state.filters.center === 'ALL') {
+      let maxC = 0;
+      for (const c in sectorCenters[sName]) {
+        if (sectorCenters[sName][c] > maxC) {
+          maxC = sectorCenters[sName][c];
+          bestCenter = c;
+        }
+      }
+    }
+
+    const seniors = [];
+    const adults = [];
+    const minors = [];
+
+    for (let i = 0; i < sItems.length; i++) {
+      const it = sItems[i];
+      if (it.e >= 65) seniors.push(it);
+      else if (it.e >= 18) adults.push(it);
+      else minors.push(it);
+    }
+
+    let famNum = 1;
+    const cleanSlug = sName.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5) || 'SEC';
+    const sectorFamilies = [];
+
+    let secUnipersonales = 0;
+    let secPequenas = 0;
+    let secMedianas = 0;
+    let secNumerosas = 0;
+    let secMayores = 0;
+    let secInfancia = 0;
+    let secTramoA = 0;
+
+    while (adults.length > 0 || seniors.length > 0 || minors.length > 0) {
+      const head = adults.pop() || seniors.pop() || minors.pop();
+      const year = head.y || (state.filters ? state.filters.year : '2027');
+      const famId = `FAM-${cleanSlug}-${String(famNum).padStart(5, '0')}`;
+      const folio = `FF-${year}-${cleanSlug}-${String(famNum).padStart(5, '0')}`;
+      const center = head.c || bestCenter;
+
+      const members = [];
+      members.push({
+        num: 1,
+        rol: 'Jefe/a de Hogar',
+        g: head.g,
+        e: head.e,
+        t: head.t,
+        n: head.n,
+        et: head.et,
+        p: head.p,
+        d: head.d,
+        cd: head.cd,
+        c: head.c,
+        s: head.s,
+        y: head.y
+      });
+
+      // Target size distribution
+      const pattern = (famNum * 7 + 3) % 10;
+      let targetSize = 1;
+      if (pattern >= 3 && pattern < 7) {
+        targetSize = 2 + (pattern % 2); // 2 or 3
+      } else if (pattern >= 7 && pattern < 9) {
+        targetSize = 4 + (pattern % 2); // 4 or 5
+      } else if (pattern >= 9) {
+        targetSize = 6 + (pattern % 2); // 6 or 7
+      }
+
+      // Fill partner
+      if (members.length < targetSize && adults.length > 0 && head.e >= 18) {
+        const p = adults.pop();
+        members.push({
+          num: members.length + 1,
+          rol: 'Cónyuge / Pareja',
+          g: p.g,
+          e: p.e,
+          t: p.t,
+          n: p.n,
+          et: p.et,
+          p: p.p,
+          d: p.d,
+          cd: p.cd,
+          c: p.c,
+          s: p.s,
+          y: p.y
+        });
+      }
+
+      // Fill minors/children
+      while (members.length < targetSize && minors.length > 0) {
+        const m = minors.pop();
+        members.push({
+          num: members.length + 1,
+          rol: 'Hijo/a',
+          g: m.g,
+          e: m.e,
+          t: m.t,
+          n: m.n,
+          et: m.et,
+          p: m.p,
+          d: m.d,
+          cd: m.cd,
+          c: m.c,
+          s: m.s,
+          y: m.y
+        });
+      }
+
+      // Fill senior
+      if (members.length < targetSize && seniors.length > 0) {
+        const s = seniors.pop();
+        members.push({
+          num: members.length + 1,
+          rol: 'Adulto Mayor / Ascendiente',
+          g: s.g,
+          e: s.e,
+          t: s.t,
+          n: s.n,
+          et: s.et,
+          p: s.p,
+          d: s.d,
+          cd: s.cd,
+          c: s.c,
+          s: s.s,
+          y: s.y
+        });
+      }
+
+      // Fill remaining adult if available
+      while (members.length < targetSize && adults.length > 0) {
+        const a = adults.pop();
+        members.push({
+          num: members.length + 1,
+          rol: 'Familiar / Dependiente',
+          g: a.g,
+          e: a.e,
+          t: a.t,
+          n: a.n,
+          et: a.et,
+          p: a.p,
+          d: a.d,
+          cd: a.cd,
+          c: a.c,
+          s: a.s,
+          y: a.y
+        });
+      }
+
+      // Categorize household
+      const mCount = members.length;
+      const hasChildren = members.some(m => m.e < 18);
+      const hasInfancia09 = members.some(m => m.e < 10);
+      const hasSenior = members.some(m => m.e >= 65);
+      const hasTramoA = members.some(m => m.t === 'A');
+
+      let category = 'Unipersonal';
+      if (mCount === 1) {
+        category = members[0].e >= 65 ? 'Adulto Mayor Solo' : 'Unipersonal';
+        secUnipersonales++;
+      } else if (mCount <= 3) {
+        secPequenas++;
+        if (hasChildren) category = 'Monoparental con Hijo';
+        else if (hasSenior) category = 'Pareja Adultos Mayores';
+        else category = 'Nuclear sin Hijos';
+      } else if (mCount <= 5) {
+        secMedianas++;
+        if (hasSenior && hasChildren) category = 'Extendida Multigeneracional';
+        else if (hasChildren) category = 'Nuclear con Hijos';
+        else category = 'Hogar Adulto Compartido';
+      } else {
+        secNumerosas++;
+        category = 'Familia Numerosa (6+)';
+      }
+
+      if (hasSenior) secMayores++;
+      if (hasInfancia09) secInfancia++;
+      if (hasTramoA) secTramoA++;
+
+      const familyObj = {
+        id: famId,
+        folio: folio,
+        sector: sName,
+        center: center,
+        year: year,
+        category: category,
+        membersCount: mCount,
+        hasSenior: hasSenior,
+        hasInfancia: hasInfancia09,
+        hasTramoA: hasTramoA,
+        members: members
+      };
+
+      sectorFamilies.push(familyObj);
+      allFamilies.push(familyObj);
+      famNum++;
+    }
+
+    globalUnipersonales += secUnipersonales;
+    globalInfancia += secInfancia;
+    globalMayores += secMayores;
+    globalTramoA += secTramoA;
+
+    sectorsSummary.push({
+      sector: sName,
+      center: bestCenter,
+      year: state.filters ? state.filters.year : '2027',
+      familiesCount: sectorFamilies.length,
+      personsCount: sItems.length,
+      unipersonales: secUnipersonales,
+      pequenas: secPequenas,
+      medianas: secMedianas,
+      numerosas: secNumerosas,
+      conMayores: secMayores,
+      conInfancia: secInfancia,
+      tramoA: secTramoA
+    });
+  }
+
+  // Sort sectors by persons count descending
+  sectorsSummary.sort((a, b) => b.personsCount - a.personsCount);
+
+  const totalFamilies = allFamilies.length;
+  const totalPersons = list.length;
+
+  return {
+    families: allFamilies,
+    sectorsSummary: sectorsSummary,
+    totalFamilies: totalFamilies,
+    totalPersons: totalPersons,
+    kpis: {
+      totalFamilies: totalFamilies,
+      totalPersons: totalPersons,
+      promedio: totalFamilies > 0 ? (totalPersons / totalFamilies) : 0,
+      unipersonales: globalUnipersonales,
+      infancia: globalInfancia,
+      mayores: globalMayores,
+      tramoA: globalTramoA
+    }
+  };
+}
+
+function renderFamiliasModule() {
+  if (!state.familiasData) {
+    state.familiasData = buildFamiliesFromRecords();
+  }
+
+  const data = state.familiasData;
+  if (!data) return;
+
+  const kpis = data.kpis;
+  const isFilteredCenter = state.filters && state.filters.center !== 'ALL';
+
+  // Badge center name
+  const badgeCenter = document.getElementById('familias-badge-center');
+  if (badgeCenter) {
+    badgeCenter.textContent = isFilteredCenter ? state.filters.center : 'Comuna de Lampa';
+  }
+
+  // KPI cards
+  const elTotal = document.getElementById('kpi-fam-total');
+  const elTotalSub = document.getElementById('kpi-fam-personas-sub');
+  const elProm = document.getElementById('kpi-fam-promedio');
+  const elUni = document.getElementById('kpi-fam-unipersonal');
+  const elUniPct = document.getElementById('kpi-fam-unipersonal-pct');
+  const elInf = document.getElementById('kpi-fam-infancia');
+  const elInfPct = document.getElementById('kpi-fam-infancia-pct');
+  const elMay = document.getElementById('kpi-fam-mayores');
+  const elMayPct = document.getElementById('kpi-fam-mayores-pct');
+  const elTrA = document.getElementById('kpi-fam-tramo-a');
+  const elTrAPct = document.getElementById('kpi-fam-tramo-a-pct');
+
+  if (elTotal) elTotal.textContent = formatNum(kpis.totalFamilies);
+  if (elTotalSub) elTotalSub.textContent = `${formatNum(kpis.totalPersons)} personas`;
+  if (elProm) elProm.textContent = kpis.promedio.toFixed(2);
+  if (elUni) elUni.textContent = formatNum(kpis.unipersonales);
+  if (elUniPct) elUniPct.textContent = formatPct(kpis.unipersonales, kpis.totalFamilies) + ' del total';
+  if (elInf) elInf.textContent = formatNum(kpis.infancia);
+  if (elInfPct) elInfPct.textContent = formatPct(kpis.infancia, kpis.totalFamilies) + ' de hogares';
+  if (elMay) elMay.textContent = formatNum(kpis.mayores);
+  if (elMayPct) elMayPct.textContent = formatPct(kpis.mayores, kpis.totalFamilies) + ' de hogares';
+  if (elTrA) elTrA.textContent = formatNum(kpis.tramoA);
+  if (elTrAPct) elTrAPct.textContent = formatPct(kpis.tramoA, kpis.totalFamilies) + ' de hogares';
+
+  // Populate Sector Summary Matrix Table
+  const tableBody = document.getElementById('table-familias-sectores-body');
+  if (tableBody) {
+    if (data.sectorsSummary.length === 0) {
+      tableBody.innerHTML = `<tr><td colspan="12" class="px-3 py-6 text-center text-slate-400">No hay datos de familias para los filtros seleccionados</td></tr>`;
+    } else {
+      let rowsHtml = '';
+      let totFam = 0, totPer = 0, totUni = 0, totPeq = 0, totMed = 0, totNum = 0, totMay = 0, totInf = 0, totTrA = 0;
+
+      for (let i = 0; i < data.sectorsSummary.length; i++) {
+        const s = data.sectorsSummary[i];
+        totFam += s.familiesCount;
+        totPer += s.personsCount;
+        totUni += s.unipersonales;
+        totPeq += s.pequenas;
+        totMed += s.medianas;
+        totNum += s.numerosas;
+        totMay += s.conMayores;
+        totInf += s.conInfancia;
+        totTrA += s.tramoA;
+
+        const prom = s.familiesCount > 0 ? (s.personsCount / s.familiesCount).toFixed(2) : '0.00';
+
+        rowsHtml += `
+          <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+            <td class="px-3 py-2.5 font-bold text-slate-900 dark:text-white flex items-center space-x-1.5">
+              <span>📍</span>
+              <span>${s.sector}</span>
+            </td>
+            <td class="px-3 py-2.5 text-slate-500 max-w-[150px] truncate" title="${s.center}">${s.center}</td>
+            <td class="px-3 py-2.5 text-right font-mono font-bold text-slate-800 dark:text-slate-200">${formatNum(s.familiesCount)}</td>
+            <td class="px-3 py-2.5 text-right font-mono font-extrabold text-blue-600 dark:text-blue-400">${formatNum(s.personsCount)}</td>
+            <td class="px-3 py-2.5 text-right font-mono text-slate-600 dark:text-slate-300">${prom}</td>
+            <td class="px-3 py-2.5 text-right font-mono text-indigo-600 dark:text-indigo-400">${formatNum(s.unipersonales)}</td>
+            <td class="px-3 py-2.5 text-right font-mono text-blue-600 dark:text-blue-400">${formatNum(s.pequenas)}</td>
+            <td class="px-3 py-2.5 text-right font-mono text-teal-600 dark:text-teal-400">${formatNum(s.medianas)}</td>
+            <td class="px-3 py-2.5 text-right font-mono text-amber-600 dark:text-amber-400">${formatNum(s.numerosas)}</td>
+            <td class="px-3 py-2.5 text-right font-mono text-purple-600 dark:text-purple-400">${formatNum(s.conMayores)}</td>
+            <td class="px-3 py-2.5 text-right font-mono text-emerald-600 dark:text-emerald-400">${formatNum(s.conInfancia)}</td>
+            <td class="px-3 py-2.5 text-right font-mono font-bold text-rose-600 dark:text-rose-400">${formatNum(s.tramoA)}</td>
+          </tr>
+        `;
+      }
+
+      // Totals row
+      const globalProm = totFam > 0 ? (totPer / totFam).toFixed(2) : '0.00';
+      rowsHtml += `
+        <tr class="bg-slate-100 dark:bg-slate-800 font-bold border-t-2 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white">
+          <td class="px-3 py-2.5 uppercase tracking-wide">TOTAL CONSOLIDADO</td>
+          <td class="px-3 py-2.5 text-slate-500 font-normal">${isFilteredCenter ? state.filters.center : 'Toda la Red'}</td>
+          <td class="px-3 py-2.5 text-right font-mono">${formatNum(totFam)}</td>
+          <td class="px-3 py-2.5 text-right font-mono text-blue-600 dark:text-blue-400">${formatNum(totPer)}</td>
+          <td class="px-3 py-2.5 text-right font-mono">${globalProm}</td>
+          <td class="px-3 py-2.5 text-right font-mono text-indigo-600 dark:text-indigo-400">${formatNum(totUni)}</td>
+          <td class="px-3 py-2.5 text-right font-mono text-blue-600 dark:text-blue-400">${formatNum(totPeq)}</td>
+          <td class="px-3 py-2.5 text-right font-mono text-teal-600 dark:text-teal-400">${formatNum(totMed)}</td>
+          <td class="px-3 py-2.5 text-right font-mono text-amber-600 dark:text-amber-400">${formatNum(totNum)}</td>
+          <td class="px-3 py-2.5 text-right font-mono text-purple-600 dark:text-purple-400">${formatNum(totMay)}</td>
+          <td class="px-3 py-2.5 text-right font-mono text-emerald-600 dark:text-emerald-400">${formatNum(totInf)}</td>
+          <td class="px-3 py-2.5 text-right font-mono text-rose-600 dark:text-rose-400">${formatNum(totTrA)}</td>
+        </tr>
+      `;
+
+      tableBody.innerHTML = rowsHtml;
+    }
+  }
+
+  // Populate Sector Select for Visor
+  const selectVisorSector = document.getElementById('select-visor-familias-sector');
+  if (selectVisorSector) {
+    const currentVal = state.familiasVisorFilter.sector || 'ALL';
+    let optHtml = `<option value="ALL">Todos los Sectores (${formatNum(data.totalFamilies)})</option>`;
+    for (let i = 0; i < data.sectorsSummary.length; i++) {
+      const s = data.sectorsSummary[i];
+      optHtml += `<option value="${s.sector}">${s.sector} (${formatNum(s.familiesCount)} fam)</option>`;
+    }
+    selectVisorSector.innerHTML = optHtml;
+    selectVisorSector.value = currentVal;
+  }
+
+  // Render cards in visor
+  renderVisorFamiliasCards();
+}
+
+function renderVisorFamiliasCards() {
+  if (!state.familiasData) {
+    state.familiasData = buildFamiliesFromRecords();
+  }
+
+  const container = document.getElementById('visor-familias-container');
+  if (!container) return;
+
+  const allFams = state.familiasData.families || [];
+  const sectorFilter = state.familiasVisorFilter.sector;
+  const searchFilter = (state.familiasVisorFilter.search || '').trim().toLowerCase();
+
+  // Filter families
+  const filtered = allFams.filter(f => {
+    if (sectorFilter !== 'ALL' && f.sector !== sectorFilter) return false;
+    if (searchFilter) {
+      const matchId = f.id.toLowerCase().includes(searchFilter);
+      const matchFolio = f.folio.toLowerCase().includes(searchFilter);
+      const matchCat = f.category.toLowerCase().includes(searchFilter);
+      const matchCenter = f.center.toLowerCase().includes(searchFilter);
+      const matchMember = f.members.some(m =>
+        (m.rol && m.rol.toLowerCase().includes(searchFilter)) ||
+        (m.t && m.t.toLowerCase() === searchFilter) ||
+        (m.n && m.n.toLowerCase().includes(searchFilter)) ||
+        (m.et && m.et.toLowerCase().includes(searchFilter))
+      );
+      if (!matchId && !matchFolio && !matchCat && !matchCenter && !matchMember) return false;
+    }
+    return true;
+  });
+
+  const totalFiltered = filtered.length;
+  const pageSize = state.familiasPagination.pageSize || 8;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / pageSize));
+
+  if (state.familiasPagination.page > totalPages) state.familiasPagination.page = totalPages;
+  if (state.familiasPagination.page < 1) state.familiasPagination.page = 1;
+  const currentPage = state.familiasPagination.page;
+
+  state.familiasPagination.totalPages = totalPages;
+
+  // Update badge and pagination text
+  const badgeCount = document.getElementById('visor-familias-count-badge');
+  if (badgeCount) badgeCount.textContent = `${formatNum(totalFiltered)} familias`;
+
+  const pagInfo = document.getElementById('visor-familias-pagination-info');
+  const startIdx = totalFiltered === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const endIdx = Math.min(totalFiltered, currentPage * pageSize);
+  if (pagInfo) {
+    pagInfo.textContent = `Mostrando ${formatNum(startIdx)} - ${formatNum(endIdx)} de ${formatNum(totalFiltered)} familias`;
+  }
+
+  const pageNum = document.getElementById('visor-familias-page-num');
+  if (pageNum) pageNum.textContent = `${currentPage} / ${totalPages}`;
+
+  const btnPrev = document.getElementById('btn-fam-prev');
+  if (btnPrev) btnPrev.disabled = currentPage <= 1;
+
+  const btnNext = document.getElementById('btn-fam-next');
+  if (btnNext) btnNext.disabled = currentPage >= totalPages;
+
+  // Render cards
+  if (totalFiltered === 0) {
+    container.innerHTML = `
+      <div class="p-8 text-center bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-dashed border-slate-200 dark:border-slate-700 text-slate-500">
+        <span class="text-3xl block mb-2">🔍</span>
+        <p class="font-bold text-sm text-slate-700 dark:text-slate-300">No se encontraron familias</p>
+        <p class="text-xs text-slate-400 mt-1">Prueba seleccionando otro sector o limpiando el texto de búsqueda.</p>
+      </div>
+    `;
+    return;
+  }
+
+  const pagedItems = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  const getTramoBadge = (t) => {
+    switch (t) {
+      case 'A': return '<span class="px-1.5 py-0.5 rounded font-bold font-mono text-[10px] bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300">Tramo A</span>';
+      case 'B': return '<span class="px-1.5 py-0.5 rounded font-bold font-mono text-[10px] bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300">Tramo B</span>';
+      case 'C': return '<span class="px-1.5 py-0.5 rounded font-bold font-mono text-[10px] bg-teal-100 text-teal-700 dark:bg-teal-950 dark:text-teal-300">Tramo C</span>';
+      case 'D': return '<span class="px-1.5 py-0.5 rounded font-bold font-mono text-[10px] bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">Tramo D</span>';
+      default: return '<span class="px-1.5 py-0.5 rounded font-bold font-mono text-[10px] bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">Tramo X</span>';
+    }
+  };
+
+  const getRoleBadge = (rol) => {
+    if (rol === 'Jefe/a de Hogar') {
+      return '<span class="px-1.5 py-0.5 rounded font-bold text-[10px] bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">Jefe/a de Hogar</span>';
+    } else if (rol === 'Cónyuge / Pareja') {
+      return '<span class="px-1.5 py-0.5 rounded font-semibold text-[10px] bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300">Cónyuge / Pareja</span>';
+    } else if (rol === 'Adulto Mayor / Ascendiente') {
+      return '<span class="px-1.5 py-0.5 rounded font-semibold text-[10px] bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">Adulto Mayor</span>';
+    } else if (rol === 'Hijo/a') {
+      return '<span class="px-1.5 py-0.5 rounded font-semibold text-[10px] bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">Hijo/a</span>';
+    }
+    return `<span class="px-1.5 py-0.5 rounded font-medium text-[10px] bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">${rol}</span>`;
+  };
+
+  let cardsHtml = '';
+  for (let i = 0; i < pagedItems.length; i++) {
+    const f = pagedItems[i];
+    cardsHtml += `
+      <div class="p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm hover:border-blue-400 dark:hover:border-blue-600 transition space-y-3">
+        <!-- Card Top Bar -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-2.5">
+          <div class="flex items-center space-x-2.5">
+            <div class="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center text-sm font-bold">
+              🏠
+            </div>
+            <div>
+              <div class="flex items-center space-x-2">
+                <span class="font-mono font-extrabold text-sm text-slate-900 dark:text-white">${f.id}</span>
+                <span class="font-mono text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 font-semibold">${f.folio}</span>
+              </div>
+              <div class="text-[11px] text-slate-400 truncate max-w-sm">
+                <span>${f.center}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-1.5">
+            <span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/60">
+              📍 ${f.sector}
+            </span>
+            <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/50 dark:border-indigo-800/50">
+              ${f.category}
+            </span>
+            <span class="px-2 py-0.5 rounded-full text-[11px] font-bold font-mono bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+              👥 ${f.membersCount} integrante${f.membersCount > 1 ? 's' : ''}
+            </span>
+            ${f.hasTramoA ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200/50">Tramo A</span>' : ''}
+            ${f.hasSenior ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200/50">👴 Adulto 65+</span>' : ''}
+            ${f.hasInfancia ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200/50">👶 Niño/a 0-9</span>' : ''}
+          </div>
+        </div>
+
+        <!-- Members Table -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="text-[10px] uppercase font-bold text-slate-400 bg-slate-50 dark:bg-slate-800/40">
+              <tr>
+                <th class="px-2.5 py-1.5 w-6 text-center">#</th>
+                <th class="px-2.5 py-1.5">Rol Familiar</th>
+                <th class="px-2.5 py-1.5">Género</th>
+                <th class="px-2.5 py-1.5">Edad</th>
+                <th class="px-2.5 py-1.5">Ciclo Vital</th>
+                <th class="px-2.5 py-1.5">Tramo</th>
+                <th class="px-2.5 py-1.5">Nacionalidad</th>
+                <th class="px-2.5 py-1.5">Etnia</th>
+                <th class="px-2.5 py-1.5 text-center">Condiciones Especiales</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
+              ${f.members.map(m => {
+                const flags = [];
+                if (m.p) flags.push('<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300">PRAIS</span>');
+                if (m.d) flags.push('<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300">Discapacidad</span>');
+                if (m.cd) flags.push('<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-teal-100 text-teal-700 dark:bg-teal-950 dark:text-teal-300">Cuidador</span>');
+                const flagsHtml = flags.length > 0 ? flags.join(' ') : '<span class="text-slate-400 text-[10px]">-</span>';
+
+                const genderLabel = m.g === 'MUJER' || m.g === 'MUJERES' ? 'Mujer' : (m.g === 'HOMBRE' || m.g === 'HOMBRES' ? 'Hombre' : m.g);
+
+                return `
+                  <tr class="hover:bg-slate-50/80 dark:hover:bg-slate-800/30">
+                    <td class="px-2.5 py-2 text-center font-mono text-slate-400 font-bold">${m.num}</td>
+                    <td class="px-2.5 py-2 whitespace-nowrap">${getRoleBadge(m.rol)}</td>
+                    <td class="px-2.5 py-2 whitespace-nowrap font-medium">${genderLabel}</td>
+                    <td class="px-2.5 py-2 whitespace-nowrap font-mono font-bold text-slate-900 dark:text-white">${m.e} <span class="font-normal text-slate-400 text-[10px]">años</span></td>
+                    <td class="px-2.5 py-2 whitespace-nowrap text-slate-500">${getCicloVital(m.e)}</td>
+                    <td class="px-2.5 py-2 whitespace-nowrap">${getTramoBadge(m.t)}</td>
+                    <td class="px-2.5 py-2 whitespace-nowrap">${m.n || 'Sin Datos'}</td>
+                    <td class="px-2.5 py-2 whitespace-nowrap text-slate-500">${m.et || 'No tiene'}</td>
+                    <td class="px-2.5 py-2 text-center whitespace-nowrap">${flagsHtml}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  container.innerHTML = cardsHtml;
+}
+
+function onVisorSectorChange() {
+  const select = document.getElementById('select-visor-familias-sector');
+  if (select) {
+    state.familiasVisorFilter.sector = select.value;
+    state.familiasPagination.page = 1;
+    renderVisorFamiliasCards();
+  }
+}
+
+function onVisorSearchInput() {
+  const input = document.getElementById('input-search-familias');
+  if (input) {
+    state.familiasVisorFilter.search = input.value;
+    state.familiasPagination.page = 1;
+    renderVisorFamiliasCards();
+  }
+}
+
+function changeVisorPage(delta) {
+  const newPage = state.familiasPagination.page + delta;
+  if (newPage >= 1 && newPage <= state.familiasPagination.totalPages) {
+    state.familiasPagination.page = newPage;
+    renderVisorFamiliasCards();
+    const visorEl = document.getElementById('tab-familias');
+    if (visorEl) {
+      const topOffset = document.getElementById('visor-familias-container')?.offsetTop || 0;
+      window.scrollTo({ top: Math.max(0, topOffset - 120), behavior: 'smooth' });
+    }
+  }
+}
+
+function exportDetailedFamiliesCSV() {
+  if (!state.familiasData) {
+    state.familiasData = buildFamiliesFromRecords();
+  }
+
+  const data = state.familiasData;
+  if (!data || !data.families || data.families.length === 0) {
+    alert('No hay información de familias disponible para exportar con los filtros actuales.');
+    return;
+  }
+
+  const families = data.families;
+  const year = state.filters ? state.filters.year : '2027';
+
+  // UTF-8 BOM for Excel compatibility
+  let csvContent = '\uFEFF';
+  const headers = [
+    'ID_FAMILIA',
+    'FOLIO_FICHA_FAMILIAR',
+    'SECTOR',
+    'CENTRO_SALUD',
+    'AÑO',
+    'NUMERO_INTEGRANTE',
+    'TOTAL_INTEGRANTES_FAMILIA',
+    'ROL_FAMILIAR',
+    'CATEGORIA_FAMILIA',
+    'GENERO',
+    'EDAD',
+    'CICLO_VITAL',
+    'TRAMO_FONASA',
+    'NACIONALIDAD',
+    'ETNIA',
+    'PRAIS',
+    'DISCAPACITADO',
+    'CUIDADOR'
+  ];
+  csvContent += headers.join(',') + '\n';
+
+  let totalMembersExported = 0;
+  for (let i = 0; i < families.length; i++) {
+    const f = families[i];
+    const members = f.members;
+    for (let j = 0; j < members.length; j++) {
+      const m = members[j];
+      totalMembersExported++;
+
+      const row = [
+        `"${f.id}"`,
+        `"${f.folio}"`,
+        `"${f.sector}"`,
+        `"${f.center}"`,
+        f.year,
+        m.num,
+        f.membersCount,
+        `"${m.rol}"`,
+        `"${f.category}"`,
+        `"${m.g}"`,
+        m.e,
+        `"${getCicloVital(m.e)}"`,
+        `"${m.t}"`,
+        `"${m.n || 'Sin Datos'}"`,
+        `"${m.et || 'No tiene'}"`,
+        m.p ? 'SI' : 'NO',
+        m.d ? 'SI' : 'NO',
+        m.cd ? 'SI' : 'NO'
+      ];
+      csvContent += row.join(',') + '\n';
+    }
+  }
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  const centerSlug = state.filters && state.filters.center !== 'ALL' ? `_${state.filters.center.replace(/[^a-zA-Z0-9]/g, '_')}` : '';
+  link.setAttribute('download', `Detalle_Familias_e_Integrantes_Lampa_${year}${centerSlug}_${Date.now()}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+
+  showToast(`Descargadas ${formatNum(families.length)} familias con ${formatNum(totalMembersExported)} integrantes`, '📥');
+}
+
+function exportRecuentoFamiliasCSV() {
+  if (!state.familiasData) {
+    state.familiasData = buildFamiliesFromRecords();
+  }
+
+  const data = state.familiasData;
+  if (!data || !data.sectorsSummary || data.sectorsSummary.length === 0) {
+    alert('No hay información de recuento de familias para exportar.');
+    return;
+  }
+
+  const summary = data.sectorsSummary;
+  const year = state.filters ? state.filters.year : '2027';
+  const totalPersons = data.totalPersons || 1;
+
+  let csvContent = '\uFEFF';
+  const headers = [
+    'SECTOR',
+    'ESTABLECIMIENTO',
+    'AÑO',
+    'RECUENTO_FICHAS_FAMILIAS',
+    'TOTAL_PERSONAS',
+    'PROMEDIO_PERSONAS_POR_FAMILIA',
+    'PORCENTAJE_DEL_TOTAL',
+    'HOGARES_UNIPERSONALES_1_PERS',
+    'FAMILIAS_PEQUENAS_2_A_3_PERS',
+    'FAMILIAS_MEDIANAS_4_A_5_PERS',
+    'FAMILIAS_NUMEROSAS_6_MAS_PERS',
+    'FAMILIAS_CON_ADULTOS_MAYORES_65',
+    'FAMILIAS_CON_INFANCIA_0_A_9',
+    'FAMILIAS_TRAMO_A'
+  ];
+  csvContent += headers.join(',') + '\n';
+
+  for (let i = 0; i < summary.length; i++) {
+    const s = summary[i];
+    const prom = s.familiesCount > 0 ? (s.personsCount / s.familiesCount).toFixed(2) : '0.00';
+    const pct = ((s.personsCount / totalPersons) * 100).toFixed(1) + '%';
+
+    const row = [
+      `"${s.sector}"`,
+      `"${s.center}"`,
+      s.year,
+      s.familiesCount,
+      s.personsCount,
+      prom,
+      `"${pct}"`,
+      s.unipersonales,
+      s.pequenas,
+      s.medianas,
+      s.numerosas,
+      s.conMayores,
+      s.conInfancia,
+      s.tramoA
+    ];
+    csvContent += row.join(',') + '\n';
+  }
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  const centerSlug = state.filters && state.filters.center !== 'ALL' ? `_${state.filters.center.replace(/[^a-zA-Z0-9]/g, '_')}` : '';
+  link.setAttribute('download', `Recuento_Familias_por_Sector_Lampa_${year}${centerSlug}_${Date.now()}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+
+  showToast(`Descargado recuento de familias por sector (${summary.length} sectores)`, '📊');
 }
 
 // ==========================================================
@@ -4102,3 +4915,11 @@ window.switchTab = switchTab;
 window.exportFilteredCSV = exportFilteredCSV;
 window.updateSimuladorCalculations = updateSimuladorCalculations;
 window.renderActiveTab = renderActiveTab;
+window.buildFamiliesFromRecords = buildFamiliesFromRecords;
+window.renderFamiliasModule = renderFamiliasModule;
+window.renderVisorFamiliasCards = renderVisorFamiliasCards;
+window.onVisorSectorChange = onVisorSectorChange;
+window.onVisorSearchInput = onVisorSearchInput;
+window.changeVisorPage = changeVisorPage;
+window.exportDetailedFamiliesCSV = exportDetailedFamiliesCSV;
+window.exportRecuentoFamiliasCSV = exportRecuentoFamiliasCSV;

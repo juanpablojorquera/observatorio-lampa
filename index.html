@@ -620,6 +620,9 @@
         <button data-tab="tab-inclusion" onclick="switchTab('tab-inclusion')" class="tab-btn py-2.5 px-3 border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 whitespace-nowrap flex items-center space-x-2">
           <span>🌎 Migración & Inclusión</span>
         </button>
+        <button data-tab="tab-familias" onclick="switchTab('tab-familias')" class="tab-btn py-2.5 px-3 border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 whitespace-nowrap flex items-center space-x-2">
+          <span>👨‍👩‍👧‍👦 Familias por Sector</span>
+        </button>
         <button data-tab="tab-simulador" onclick="switchTab('tab-simulador')" class="tab-btn py-2.5 px-3 border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 whitespace-nowrap flex items-center space-x-2">
           <span>💰 Financiamiento Per Cápita</span>
         </button>
@@ -778,6 +781,13 @@
           <div class="h-64 w-full">
             <canvas id="chart-sectores"></canvas>
           </div>
+          <button type="button" onclick="switchTab('tab-familias')" class="mt-4 w-full py-2.5 px-3.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 rounded-xl text-xs font-bold flex items-center justify-between transition border border-blue-200/60 dark:border-blue-800/60 group">
+            <span class="flex items-center space-x-2">
+              <span>👨‍👩‍👧‍👦</span>
+              <span>Ver Familias por Sector y Descargar Información Detallada</span>
+            </span>
+            <span class="group-hover:translate-x-1 transition-transform">→</span>
+          </button>
         </div>
 
       </div>
@@ -1602,6 +1612,183 @@
 
       </div>
 
+      <!-- TAB: Familias por Sector -->
+      <div id="tab-familias" class="tab-content hidden space-y-6">
+        
+        <!-- Header Card with Highlighted Action Buttons -->
+        <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200/80 dark:border-slate-800">
+          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div>
+              <div class="flex items-center space-x-2">
+                <span class="px-2.5 py-1 rounded-full text-xs font-extrabold bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                  Modelo de Salud Familiar y Comunitario (APS)
+                </span>
+                <span id="familias-badge-center" class="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  Comuna de Lampa
+                </span>
+              </div>
+              <h3 id="title-familias-modulo" class="text-lg font-bold text-slate-900 dark:text-white mt-1">
+                Familias y Fichas Familiares por Sector Territorial
+              </h3>
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                Estructura de hogares, caracterización demográfica de integrantes y descarga de nóminas territoriales
+              </p>
+            </div>
+
+            <!-- Primary Download Actions -->
+            <div class="flex flex-wrap items-center gap-2.5">
+              <button type="button" id="btn-download-familias-detalle" onclick="exportDetailedFamiliesCSV()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs rounded-xl shadow-md hover:shadow-lg transition flex items-center space-x-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                </svg>
+                <span>Descargar Detalle Familias e Integrantes (CSV)</span>
+              </button>
+
+              <button type="button" id="btn-download-familias-recuento" onclick="exportRecuentoFamiliasCSV()" class="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 text-slate-700 dark:text-slate-200 font-bold text-xs rounded-xl border border-slate-200 dark:border-slate-700 transition flex items-center space-x-1.5 shadow-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                <span>Descargar Recuento Resumen (CSV)</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- KPI Cards Grid -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+          <div class="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-200/80 dark:border-slate-800">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Total Fichas Familias</span>
+            <div id="kpi-fam-total" class="text-2xl font-extrabold font-mono text-slate-900 dark:text-white mt-1">0</div>
+            <span id="kpi-fam-personas-sub" class="text-[11px] text-slate-500 font-mono">0 personas</span>
+          </div>
+
+          <div class="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-200/80 dark:border-slate-800">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Prom. Integrantes / Fam</span>
+            <div id="kpi-fam-promedio" class="text-2xl font-extrabold font-mono text-blue-600 dark:text-blue-400 mt-1">0.0</div>
+            <span class="text-[11px] text-slate-500">Personas por hogar</span>
+          </div>
+
+          <div class="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-200/80 dark:border-slate-800">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Hogares Unipersonales</span>
+            <div id="kpi-fam-unipersonal" class="text-2xl font-extrabold font-mono text-indigo-600 dark:text-indigo-400 mt-1">0</div>
+            <span id="kpi-fam-unipersonal-pct" class="text-[11px] text-slate-500">0% del total</span>
+          </div>
+
+          <div class="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-200/80 dark:border-slate-800">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Con Infancia (0-9)</span>
+            <div id="kpi-fam-infancia" class="text-2xl font-extrabold font-mono text-emerald-600 dark:text-emerald-400 mt-1">0</div>
+            <span id="kpi-fam-infancia-pct" class="text-[11px] text-slate-500">0% de hogares</span>
+          </div>
+
+          <div class="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-200/80 dark:border-slate-800">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Con Adultos 65+</span>
+            <div id="kpi-fam-mayores" class="text-2xl font-extrabold font-mono text-amber-600 dark:text-amber-400 mt-1">0</div>
+            <span id="kpi-fam-mayores-pct" class="text-[11px] text-slate-500">0% de hogares</span>
+          </div>
+
+          <div class="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-200/80 dark:border-slate-800">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Familias Tramo A</span>
+            <div id="kpi-fam-tramo-a" class="text-2xl font-extrabold font-mono text-rose-600 dark:text-rose-400 mt-1">0</div>
+            <span id="kpi-fam-tramo-a-pct" class="text-[11px] text-slate-500">Alta vulnerabilidad</span>
+          </div>
+        </div>
+
+        <!-- Matriz Consolidada de Familias por Sector -->
+        <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200/80 dark:border-slate-800">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-base font-bold text-slate-900 dark:text-white">
+                Matriz de Recuento de Familias por Sector Territorial
+              </h3>
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                Resumen estadístico por sector territorial según tipología de hogares y composición etaria
+              </p>
+            </div>
+            <button type="button" onclick="exportRecuentoFamiliasCSV()" class="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center space-x-1">
+              <span>Descargar esta tabla</span>
+              <span>↓</span>
+            </button>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left">
+              <thead class="bg-slate-50 dark:bg-slate-800/60 uppercase font-bold text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
+                <tr>
+                  <th class="px-3 py-2.5">Sector</th>
+                  <th class="px-3 py-2.5">Centro</th>
+                  <th class="px-3 py-2.5 text-right">Fichas Familias</th>
+                  <th class="px-3 py-2.5 text-right font-bold text-slate-900 dark:text-white">Total Personas</th>
+                  <th class="px-3 py-2.5 text-right">Prom. Personas</th>
+                  <th class="px-3 py-2.5 text-right text-indigo-600 dark:text-indigo-400">Unipersonales (1)</th>
+                  <th class="px-3 py-2.5 text-right text-blue-600 dark:text-blue-400">Pequeñas (2-3)</th>
+                  <th class="px-3 py-2.5 text-right text-teal-600 dark:text-teal-400">Medianas (4-5)</th>
+                  <th class="px-3 py-2.5 text-right text-amber-600 dark:text-amber-400">Numerosas (6+)</th>
+                  <th class="px-3 py-2.5 text-right text-purple-600 dark:text-purple-400">Con 65+</th>
+                  <th class="px-3 py-2.5 text-right text-emerald-600 dark:text-emerald-400">Con 0-9</th>
+                  <th class="px-3 py-2.5 text-right text-rose-600 dark:text-rose-400 font-bold">Tramo A</th>
+                </tr>
+              </thead>
+              <tbody id="table-familias-sectores-body" class="divide-y divide-slate-100 dark:divide-slate-800">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Visor Interactivo de Familias y sus Integrantes -->
+        <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200/80 dark:border-slate-800 space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div>
+              <h3 class="text-base font-bold text-slate-900 dark:text-white flex items-center space-x-2">
+                <span>Nómina Detallada de Familias e Integrantes</span>
+                <span id="visor-familias-count-badge" class="px-2 py-0.5 rounded-full text-xs font-mono bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                  0 familias
+                </span>
+              </h3>
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                Explora cada ficha familiar con su composición, roles, parentesco y datos de salud
+              </p>
+            </div>
+
+            <!-- Visor Controls -->
+            <div class="flex flex-wrap items-center gap-2 text-xs">
+              <div class="flex items-center space-x-1.5">
+                <span class="text-slate-500 font-medium">Sector:</span>
+                <select id="select-visor-familias-sector" onchange="onVisorSectorChange()" class="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 font-bold text-slate-800 dark:text-slate-200">
+                  <option value="ALL">Todos los Sectores</option>
+                </select>
+              </div>
+
+              <div class="relative min-w-[200px]">
+                <input type="text" id="input-search-familias" oninput="onVisorSearchInput()" placeholder="Buscar por ID, rol, tramo..." class="w-full pl-8 pr-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-blue-500">
+                <svg class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+              </div>
+
+              <button type="button" onclick="exportDetailedFamiliesCSV()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg transition flex items-center space-x-1 shadow-sm">
+                <span>📥 Descargar Detalle (CSV)</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Cards Container of Families & Members -->
+          <div id="visor-familias-container" class="space-y-3">
+            <!-- Dynamically populated -->
+          </div>
+
+          <!-- Visor Pagination -->
+          <div class="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800 text-xs">
+            <span id="visor-familias-pagination-info" class="text-slate-500 font-medium">Mostrando 0 familias</span>
+            <div class="flex items-center space-x-2">
+              <button type="button" id="btn-fam-prev" onclick="changeVisorPage(-1)" class="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 transition font-medium">← Anterior</button>
+              <span id="visor-familias-page-num" class="font-mono font-bold text-slate-700 dark:text-slate-300">1 / 1</span>
+              <button type="button" id="btn-fam-next" onclick="changeVisorPage(1)" class="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 transition font-medium">Siguiente →</button>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
       <!-- TAB 5: Explorador de Datos y Exportación -->
       <div id="tab-datos" class="tab-content hidden space-y-4">
         
@@ -1634,6 +1821,14 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
               </svg>
               <span>Exportar Selección (CSV)</span>
+            </button>
+
+            <!-- Export Detailed Families Button -->
+            <button id="btn-export-familias-csv" onclick="exportDetailedFamiliesCSV()" class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm transition">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+              </svg>
+              <span>Descargar Familias e Integrantes (CSV)</span>
             </button>
           </div>
 
